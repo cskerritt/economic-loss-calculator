@@ -147,7 +147,7 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
         </div>
         
         {/* Navigation Buttons */}
-        <div className="flex justify-between pb-4">
+        <div className="flex justify-between items-center pb-4">
           <button
             onClick={onPrevious}
             disabled={currentStep === 0}
@@ -159,6 +159,17 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
           >
             <ChevronLeft className="w-4 h-4" /> Previous
           </button>
+          
+          {/* Keyboard hint */}
+          <div className="hidden lg:flex items-center gap-2 text-[10px] text-muted-foreground">
+            <span className="px-1.5 py-0.5 bg-muted rounded border border-border font-mono">←</span>
+            <span className="px-1.5 py-0.5 bg-muted rounded border border-border font-mono">→</span>
+            <span>or</span>
+            <span className="px-1.5 py-0.5 bg-muted rounded border border-border font-mono">1</span>
+            <span>-</span>
+            <span className="px-1.5 py-0.5 bg-muted rounded border border-border font-mono">7</span>
+            <span>to navigate</span>
+          </div>
           
           <button
             onClick={onNext}

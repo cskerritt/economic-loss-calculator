@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Sigma, User, Briefcase, BookOpen, Home, HeartPulse, FileText, BarChart3,
-  Menu, X, AlertCircle, CheckCircle2, Sparkles
+  Menu, X, AlertCircle, CheckCircle2, Sparkles, Save, Clock
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
@@ -37,6 +37,17 @@ const WIZARD_STEPS: WizardStep[] = [
   { id: 'report', label: 'Report', icon: FileText },
 ];
 
+// Format relative time
+const formatLastSaved = (date: Date | null): string => {
+  if (!date) return 'Not saved';
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diff < 5) return 'Just now';
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 export default function ForensicSuite() {
   const [currentStep, setCurrentStep] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,6 +55,8 @@ export default function ForensicSuite() {
   const reportRef = useRef<HTMLDivElement>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingWord, setIsExportingWord] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveIndicatorVisible, setSaveIndicatorVisible] = useState(false);
 
   const normalizeLcpItems = useCallback((items: LcpItem[] = []): LcpItem[] => {
     return items.map((item) => {
@@ -109,12 +122,53 @@ export default function ForensicSuite() {
     }
   });
 
-  // Auto-Save
-  useEffect(() => { localStorage.setItem('fs_case_v10', JSON.stringify(caseInfo)); }, [caseInfo]);
-  useEffect(() => { localStorage.setItem('fs_params_v10', JSON.stringify(earningsParams)); }, [earningsParams]);
-  useEffect(() => { localStorage.setItem('fs_lcp_v10', JSON.stringify(lcpItems)); }, [lcpItems]);
-  useEffect(() => { localStorage.setItem('fs_past_actuals_v10', JSON.stringify(pastActuals)); }, [pastActuals]);
-  useEffect(() => { localStorage.setItem('fs_hhs_v10', JSON.stringify(hhServices)); }, [hhServices]);
+  // Auto-Save with timestamp tracking
+  const triggerSave = useCallback(() => {
+    setLastSaved(new Date());
+    setSaveIndicatorVisible(true);
+    setTimeout(() => setSaveIndicatorVisible(false), 2000);
+  }, []);
+
+  useEffect(() => { localStorage.setItem('fs_case_v10', JSON.stringify(caseInfo)); triggerSave(); }, [caseInfo]);
+  useEffect(() => { localStorage.setItem('fs_params_v10', JSON.stringify(earningsParams)); triggerSave(); }, [earningsParams]);
+  useEffect(() => { localStorage.setItem('fs_lcp_v10', JSON.stringify(lcpItems)); triggerSave(); }, [lcpItems]);
+  useEffect(() => { localStorage.setItem('fs_past_actuals_v10', JSON.stringify(pastActuals)); triggerSave(); }, [pastActuals]);
+  useEffect(() => { localStorage.setItem('fs_hhs_v10', JSON.stringify(hhServices)); triggerSave(); }, [hhServices]);
+
+  // Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't navigate if user is typing in an input
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCurrentStep(prev => Math.min(prev + 1, WIZARD_STEPS.length - 1));
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCurrentStep(prev => Math.max(prev - 1, 0));
+      } else if (e.key >= '1' && e.key <= '7') {
+        e.preventDefault();
+        const stepIndex = parseInt(e.key) - 1;
+        if (stepIndex >= 0 && stepIndex < WIZARD_STEPS.length) {
+          setCurrentStep(stepIndex);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Update last saved time display periodically
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    const interval = setInterval(() => forceUpdate({}), 30000); // Update every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   // Step Completion Calculation
   const stepCompletion: StepCompletion = useMemo(() => {
@@ -372,6 +426,20 @@ export default function ForensicSuite() {
           </div>
           
           <div className="hidden md:flex items-center gap-4">
+            {/* Auto-save indicator */}
+            <div className={`flex items-center gap-1.5 text-xs transition-all duration-300 ${saveIndicatorVisible ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+              {saveIndicatorVisible ? (
+                <>
+                  <Save className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{formatLastSaved(lastSaved)}</span>
+                </>
+              )}
+            </div>
             <span className="text-sm text-muted-foreground">
               Step {currentStep + 1} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep].label}
             </span>
