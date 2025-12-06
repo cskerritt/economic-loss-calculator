@@ -45,6 +45,18 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
 }) => {
   const startYear = dateOfInjury ? new Date(dateOfInjury).getFullYear() : new Date().getFullYear();
   const fullPast = Math.floor(dateCalc.pastYears);
+  const applyRecommendedEconomic = React.useCallback(() => {
+    setEarningsParams(prev => ({
+      ...prev,
+      wageGrowth: 3.0,
+      discountRate: 4.25,
+      unemploymentRate: 4.2,
+      uiReplacementRate: 40.0,
+      fedTaxRate: 15.0,
+      stateTaxRate: 4.5,
+      fringeRate: isUnionMode ? prev.fringeRate : 21.5
+    }));
+  }, [setEarningsParams, isUnionMode]);
 
   // Calculate age at injury (with NaN protection)
   const ageAtInjury = useMemo(() => {
@@ -112,6 +124,27 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+      <div className="print:hidden bg-muted border border-border rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-foreground">Don’t know what to enter?</p>
+          <p className="text-xs text-muted-foreground">Use the recommended baseline to fill growth, discount, unemployment, tax, and fringe assumptions. Your wage numbers and WLE stay untouched.</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={applyRecommendedEconomic}
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 shadow-sm"
+          >
+            Apply recommended baseline
+          </button>
+          <button
+            onClick={() => setEarningsParams(prev => ({ ...prev, useManualYFS: false, selectedScenario: prev.selectedScenario || 'age67' }))}
+            className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-background"
+          >
+            Use calculated YFS
+          </button>
+        </div>
+      </div>
+
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground">Earnings & Economic Variables</h2>
         <p className="text-muted-foreground mt-1">Configure earnings capacity, work life, and retirement scenarios</p>
@@ -122,8 +155,9 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
         <Card className="p-5 border-l-4 border-l-indigo">
           <SectionHeader icon={Briefcase} title="Vocational Statistics" subtitle="Earnings & Work Life" />
           <div className="space-y-3">
-            <InputGroup label="Pre-Injury Earnings Capacity" prefix="$" value={earningsParams.baseEarnings} onChange={v => setEarningsParams({...earningsParams, baseEarnings: parseFloat(v) || 0})} />
-            <InputGroup label="Post-Injury Residual Capacity" prefix="$" value={earningsParams.residualEarnings} onChange={v => setEarningsParams({...earningsParams, residualEarnings: parseFloat(v) || 0})} />
+            <InputGroup label="Pre-Injury Earnings Capacity" prefix="$" value={earningsParams.baseEarnings} onChange={v => setEarningsParams({...earningsParams, baseEarnings: parseFloat(v) || 0})} placeholder="Annual gross pay before the injury" />
+            <InputGroup label="Post-Injury Residual Capacity" prefix="$" value={earningsParams.residualEarnings} onChange={v => setEarningsParams({...earningsParams, residualEarnings: parseFloat(v) || 0})} placeholder="Set to 0 if unable to work" />
+            <p className="text-xs text-muted-foreground -mt-2">Use yearly amounts. Residual is what the person can realistically earn after the injury.</p>
             
             <div className="border-t border-border pt-3 mt-3">
               <h4 className="text-[10px] font-bold uppercase text-muted-foreground mb-2">Work Life Expectancy</h4>
@@ -133,7 +167,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
                 value={earningsParams.wle} 
                 onChange={v => setEarningsParams({...earningsParams, wle: parseFloat(v) || 0})} 
                 step="0.01"
-                placeholder="XX.XX"
+                placeholder="Years expected in the workforce (e.g., 17.5)"
               />
               
               {ageAtInjury > 0 && (
@@ -169,7 +203,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
                   step="0.01"
                 />
               ) : (
-                <p className="text-xs text-muted-foreground">YFS calculated automatically from selected scenario</p>
+                <p className="text-xs text-muted-foreground">YFS is auto-calculated from the active retirement scenario above. Turn on the checkbox only if you must force a specific retirement timeline.</p>
               )}
             </div>
           </div>
@@ -301,13 +335,22 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
 
         {/* Economic Variables */}
         <Card className="p-5 border-l-4 border-l-emerald">
-          <SectionHeader icon={TrendingUp} title="Economic Variables" />
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <SectionHeader icon={TrendingUp} title="Economic Variables" />
+            <button
+              onClick={applyRecommendedEconomic}
+              className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted"
+            >
+              Quick fill defaults
+            </button>
+          </div>
           <div className="space-y-3">
             <h4 className="text-[10px] font-bold uppercase text-muted-foreground">Growth & Discounting</h4>
             <div className="grid grid-cols-2 gap-2">
               <InputGroup label="Wage Growth Rate" suffix="%" value={earningsParams.wageGrowth} onChange={v => setEarningsParams({...earningsParams, wageGrowth: parseFloat(v) || 0})} />
               <InputGroup label="Discount Rate" suffix="%" value={earningsParams.discountRate} onChange={v => setEarningsParams({...earningsParams, discountRate: parseFloat(v) || 0})} />
             </div>
+            <p className="text-xs text-muted-foreground -mt-2">Typical defaults: Wage growth ~3%, Discount ~4–4.5%.</p>
             
             <h4 className="text-[10px] font-bold uppercase text-muted-foreground pt-2">Unemployment Adjustment</h4>
             <div className="grid grid-cols-2 gap-2">

@@ -35,6 +35,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   fmtPct
 }) => {
   const [copySuccess, setCopySuccess] = React.useState('');
+  const activeScenario = scenarioProjections.find((s) => s.id === selectedScenario);
 
   const copyTable = () => {
     const txt = projection.futureSchedule.map(r => `${r.year}\t${r.gross.toFixed(2)}\t${r.netLoss.toFixed(2)}\t${r.pv.toFixed(2)}`).join('\n');
@@ -48,6 +49,13 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground">Analysis Summary</h2>
         <p className="text-muted-foreground mt-1">Review calculated damages and projection schedules</p>
+      </div>
+
+      <div className="print:hidden bg-muted border border-border rounded-lg p-4">
+        <p className="text-sm font-bold text-foreground">How to read this page</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Active scenario: <span className="font-semibold text-foreground">{activeScenario?.label || 'Not set'}</span>. Use the checkboxes to include/exclude scenarios. Only checked rows flow into the exported report on the next step.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
