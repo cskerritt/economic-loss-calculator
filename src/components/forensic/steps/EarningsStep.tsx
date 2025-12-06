@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Briefcase, TrendingUp, HeartPulse, History, Calendar, Target } from 'lucide-react';
+import React, { useMemo, useState, useCallback } from 'react';
+import { Briefcase, TrendingUp, HeartPulse, History, Calendar, Target, AlertCircle } from 'lucide-react';
 import { Card, SectionHeader, InputGroup } from '../ui';
 import { EarningsParams, DateCalc, Algebraic, RETIREMENT_SCENARIOS } from '../types';
 
@@ -28,6 +28,13 @@ interface EarningsStepProps {
   fmtPct: (n: number) => string;
 }
 
+interface ValidationErrors {
+  baseEarnings?: string;
+  wle?: string;
+  wageGrowth?: string;
+  discountRate?: string;
+}
+
 export const EarningsStep: React.FC<EarningsStepProps> = ({
   earningsParams,
   setEarningsParams,
@@ -43,9 +50,48 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
   fmtUSD,
   fmtPct
 }) => {
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const markTouched = useCallback((field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  }, []);
+
+  const validate = useCallback((): ValidationErrors => {
+    const errors: ValidationErrors = {};
+    
+    if (earningsParams.baseEarnings <= 0) {
+      errors.baseEarnings = 'Pre-injury earnings must be greater than 0';
+    } else if (earningsParams.baseEarnings > 10000000) {
+      errors.baseEarnings = 'Value seems unrealistic (max $10M)';
+    }
+    
+    if (earningsParams.wle <= 0) {
+      errors.wle = 'Work life expectancy must be greater than 0';
+    } else if (earningsParams.wle > 60) {
+      errors.wle = 'WLE cannot exceed 60 years';
+    }
+    
+    if (earningsParams.wageGrowth < 0) {
+      errors.wageGrowth = 'Wage growth cannot be negative';
+    } else if (earningsParams.wageGrowth > 15) {
+      errors.wageGrowth = 'Wage growth rate seems unrealistic (max 15%)';
+    }
+    
+    if (earningsParams.discountRate < 0) {
+      errors.discountRate = 'Discount rate cannot be negative';
+    } else if (earningsParams.discountRate > 20) {
+      errors.discountRate = 'Discount rate seems unrealistic (max 20%)';
+    }
+    
+    return errors;
+  }, [earningsParams]);
+
+  const errors = validate();
+  const hasErrors = Object.keys(errors).length > 0;
+
   const startYear = dateOfInjury ? new Date(dateOfInjury).getFullYear() : new Date().getFullYear();
   const fullPast = Math.floor(dateCalc.pastYears);
-  const applyRecommendedEconomic = React.useCallback(() => {
+  const applyRecommendedEconomic = useCallback(() => {
     setEarningsParams(prev => ({
       ...prev,
       wageGrowth: 3.0,
@@ -148,6 +194,12 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground">Earnings & Economic Variables</h2>
         <p className="text-muted-foreground mt-1">Configure earnings capacity, work life, and retirement scenarios</p>
+        {hasErrors && Object.keys(touched).length > 0 && (
+          <div className="mt-3 inline-flex items-center gap-2 text-destructive text-sm bg-destructive/10 px-3 py-1.5 rounded-lg">
+            <AlertCircle className="w-4 h-4" />
+            <span>Please review the highlighted fields</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -155,7 +207,16 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
         <Card className="p-5 border-l-4 border-l-indigo">
           <SectionHeader icon={Briefcase} title="Vocational Statistics" subtitle="Earnings & Work Life" />
           <div className="space-y-3">
-            <InputGroup label="Pre-Injury Earnings Capacity" prefix="$" value={earningsParams.baseEarnings} onChange={v => setEarningsParams({...earningsParams, baseEarnings: parseFloat(v) || 0})} placeholder="Annual gross pay before the injury" />
+            <InputGroup 
+              label="Pre-Injury Earnings Capacity" 
+              prefix="$" 
+              value={earningsParams.baseEarnings} 
+              onChange={v => setEarningsParams({...earningsParams, baseEarnings: parseFloat(v) || 0})} 
+              onBlur={() => markTouched('baseEarnings')}
+              placeholder="Annual gross pay before the injury" 
+              required
+              error={touched.baseEarnings ? errors.baseEarnings : undefined}
+            />
             <InputGroup label="Post-Injury Residual Capacity" prefix="$" value={earningsParams.residualEarnings} onChange={v => setEarningsParams({...earningsParams, residualEarnings: parseFloat(v) || 0})} placeholder="Set to 0 if unable to work" />
             <p className="text-xs text-muted-foreground -mt-2">Use yearly amounts. Residual is what the person can realistically earn after the injury.</p>
             
@@ -166,8 +227,11 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
                 suffix="years" 
                 value={earningsParams.wle} 
                 onChange={v => setEarningsParams({...earningsParams, wle: parseFloat(v) || 0})} 
+                onBlur={() => markTouched('wle')}
                 step="0.01"
                 placeholder="Years expected in the workforce (e.g., 17.5)"
+                required
+                error={touched.wle ? errors.wle : undefined}
               />
               
               {ageAtInjury > 0 && (
@@ -347,8 +411,24 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
           <div className="space-y-3">
             <h4 className="text-[10px] font-bold uppercase text-muted-foreground">Growth & Discounting</h4>
             <div className="grid grid-cols-2 gap-2">
-              <InputGroup label="Wage Growth Rate" suffix="%" value={earningsParams.wageGrowth} onChange={v => setEarningsParams({...earningsParams, wageGrowth: parseFloat(v) || 0})} />
-              <InputGroup label="Discount Rate" suffix="%" value={earningsParams.discountRate} onChange={v => setEarningsParams({...earningsParams, discountRate: parseFloat(v) || 0})} />
+              <InputGroup 
+                label="Wage Growth Rate" 
+                suffix="%" 
+                value={earningsParams.wageGrowth} 
+                onChange={v => setEarningsParams({...earningsParams, wageGrowth: parseFloat(v) || 0})} 
+                onBlur={() => markTouched('wageGrowth')}
+                required
+                error={touched.wageGrowth ? errors.wageGrowth : undefined}
+              />
+              <InputGroup 
+                label="Discount Rate" 
+                suffix="%" 
+                value={earningsParams.discountRate} 
+                onChange={v => setEarningsParams({...earningsParams, discountRate: parseFloat(v) || 0})} 
+                onBlur={() => markTouched('discountRate')}
+                required
+                error={touched.discountRate ? errors.discountRate : undefined}
+              />
             </div>
             <p className="text-xs text-muted-foreground -mt-2">Typical defaults: Wage growth ~3%, Discount ~4–4.5%.</p>
             
