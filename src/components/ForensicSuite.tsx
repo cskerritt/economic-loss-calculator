@@ -307,7 +307,7 @@ export default function ForensicSuite() {
       case 'case':
         return <CaseInfoStep caseInfo={caseInfo} setCaseInfo={setCaseInfo} dateCalc={dateCalc} />;
       case 'earnings':
-        return <EarningsStep earningsParams={earningsParams} setEarningsParams={setEarningsParams} dateCalc={dateCalc} algebraic={algebraic} workLifeFactor={workLifeFactor} isUnionMode={isUnionMode} setIsUnionMode={setIsUnionMode} pastActuals={pastActuals} setPastActuals={setPastActuals} dateOfInjury={caseInfo.dateOfInjury} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
+        return <EarningsStep earningsParams={earningsParams} setEarningsParams={setEarningsParams} dateCalc={dateCalc} algebraic={algebraic} workLifeFactor={workLifeFactor} isUnionMode={isUnionMode} setIsUnionMode={setIsUnionMode} pastActuals={pastActuals} setPastActuals={setPastActuals} dateOfInjury={caseInfo.dateOfInjury} dob={caseInfo.dob} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
       case 'narratives':
         return <NarrativesStep caseInfo={caseInfo} setCaseInfo={setCaseInfo} />;
       case 'household':
