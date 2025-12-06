@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   TrendingUp, 
   FileText, 
@@ -17,8 +17,14 @@ import {
   BookOpen,
   Scale,
   Briefcase,
-  HeartPulse
+  HeartPulse,
+  Download,
+  FileDown,
+  Loader2
 } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
+import { saveAs } from 'file-saver';
 
 // --- CONSTANTS ---
 const CPI_CATEGORIES = [
@@ -205,6 +211,242 @@ const TextArea = ({ label, value, onChange, placeholder = "", rows = 3 }: TextAr
   </div>
 );
 
+// --- EXPORT BUTTONS COMPONENT ---
+interface ExportButtonsProps {
+  reportRef: React.RefObject<HTMLDivElement>;
+  caseInfo: CaseInfo;
+  dateCalc: { ageInjury: string; ageTrial: string; currentAge: string; pastYears: number; derivedYFS: number };
+  earningsParams: EarningsParams;
+  algebraic: { wlf: number; unempFactor: number; afterTaxFactor: number; fringeFactor: number; fullMultiplier: number; realizedMultiplier: number; yfs: number; flatFringeAmount: number; combinedTaxRate: number };
+  projection: { pastSchedule: Array<{ year: number; label: string; grossBase: number; grossActual: number; netLoss: number; isManual: boolean; fraction: number }>; futureSchedule: Array<{ year: number; gross: number; netLoss: number; pv: number }>; totalPastLoss: number; totalFutureNominal: number; totalFuturePV: number };
+  hhServices: HhServices;
+  hhsData: { totalNom: number; totalPV: number };
+  lcpItems: LcpItem[];
+  lcpData: { items: Array<LcpItem & { totalNom: number; totalPV: number }>; totalNom: number; totalPV: number };
+  isUnionMode: boolean;
+  grandTotal: number;
+  workLifeFactor: number;
+  fmtUSD: (n: number) => string;
+  fmtPct: (n: number) => string;
+}
+
+const ExportButtons = ({ 
+  reportRef, 
+  caseInfo, 
+  dateCalc, 
+  earningsParams, 
+  algebraic, 
+  projection, 
+  hhServices, 
+  hhsData, 
+  lcpItems, 
+  lcpData, 
+  isUnionMode, 
+  grandTotal, 
+  workLifeFactor,
+  fmtUSD, 
+  fmtPct 
+}: ExportButtonsProps) => {
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingWord, setIsExportingWord] = useState(false);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!reportRef.current) return;
+    setIsExportingPdf(true);
+    
+    try {
+      const element = reportRef.current;
+      const filename = `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}_${caseInfo.reportDate || new Date().toISOString().split('T')[0]}.pdf`;
+      
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error('PDF export error:', error);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }, [reportRef, caseInfo]);
+
+  const handleExportWord = useCallback(async () => {
+    setIsExportingWord(true);
+    
+    try {
+      const formatDate = (dateStr: string) => {
+        if (!dateStr) return '[Date]';
+        return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      };
+
+      const createTableRow = (cells: string[], isHeader = false) => {
+        return new TableRow({
+          children: cells.map((cell, idx) => new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: cell, bold: isHeader, size: 20 })],
+              alignment: idx === 0 ? AlignmentType.LEFT : AlignmentType.RIGHT
+            })],
+            width: { size: 100 / cells.length, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
+              left: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
+              right: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
+            }
+          }))
+        });
+      };
+
+      const sections = [];
+
+      // Title
+      sections.push(
+        new Paragraph({ children: [new TextRun({ text: 'APPRAISAL OF ECONOMIC LOSS', bold: true, size: 36 })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+        new Paragraph({ children: [new TextRun({ text: 'PREPARED BY: Kincaid Wolstein Vocational and Rehabilitation Services', size: 22 })], alignment: AlignmentType.CENTER }),
+        new Paragraph({ children: [new TextRun({ text: 'One University Plaza ~ Suite 302, Hackensack, New Jersey 07601', size: 22 })], alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
+        new Paragraph({ children: [new TextRun({ text: `PREPARED FOR: ${caseInfo.attorney || '[Attorney]'} - ${caseInfo.lawFirm || '[Law Firm]'}`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `REGARDING: ${caseInfo.plaintiff || '[Plaintiff]'}`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `DATE OF BIRTH: ${formatDate(caseInfo.dob)}`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `REPORT DATE: ${formatDate(caseInfo.reportDate)}`, size: 22 })], spacing: { after: 400 } })
+      );
+
+      // Certification
+      sections.push(
+        new Paragraph({ text: 'CERTIFICATION', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+        new Paragraph({ 
+          children: [new TextRun({ text: 'This is to certify that we are not related to any of the parties to the subject action, nor do we have any present or intended financial interest in this case beyond the fees due for professional services rendered in connection with this report and possible subsequent services. All assumptions, methodologies, and calculations utilized in this appraisal report are based on current knowledge and methods applied to the determination of projected pecuniary losses, consistent with accepted practices in forensic economics.', size: 22 })],
+          spacing: { after: 300 }
+        })
+      );
+
+      // Opinion of Economic Losses
+      sections.push(
+        new Paragraph({ text: 'OPINION OF ECONOMIC LOSSES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+        new Paragraph({ 
+          children: [new TextRun({ text: `Within a reasonable degree of economic certainty, ${caseInfo.plaintiff || '[Plaintiff]'} has sustained compensable economic losses as summarized below.`, size: 22 })],
+          spacing: { after: 200 }
+        })
+      );
+
+      // Summary Table
+      const summaryRows = [
+        createTableRow(['Category', 'Past Value', 'Future (PV)', 'Total'], true),
+        createTableRow(['Lost Earning Capacity', fmtUSD(projection.totalPastLoss), fmtUSD(projection.totalFuturePV), fmtUSD(projection.totalPastLoss + projection.totalFuturePV)])
+      ];
+      if (hhServices.active) {
+        summaryRows.push(createTableRow(['Household Services', '—', fmtUSD(hhsData.totalPV), fmtUSD(hhsData.totalPV)]));
+      }
+      if (lcpItems.length > 0) {
+        summaryRows.push(createTableRow(['Life Care Plan', '—', fmtUSD(lcpData.totalPV), fmtUSD(lcpData.totalPV)]));
+      }
+      summaryRows.push(createTableRow(['GRAND TOTAL', fmtUSD(projection.totalPastLoss), fmtUSD(projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV), fmtUSD(grandTotal)], true));
+
+      sections.push(new DocxTable({ rows: summaryRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+
+      // Background Facts
+      sections.push(
+        new Paragraph({ text: 'BACKGROUND FACTS AND ASSUMPTIONS', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+        new Paragraph({ children: [new TextRun({ text: `Plaintiff: ${caseInfo.plaintiff} (${caseInfo.gender})`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Date of Birth: ${formatDate(caseInfo.dob)}`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Date of Injury: ${formatDate(caseInfo.dateOfInjury)}`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Residence: ${[caseInfo.city, caseInfo.county, caseInfo.state].filter(Boolean).join(', ')}`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Education: ${caseInfo.education}`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Current Age: ${dateCalc.currentAge} years`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Age at Injury: ${dateCalc.ageInjury} years`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Life Expectancy: ${caseInfo.lifeExpectancy} years`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Work Life Expectancy: ${earningsParams.wle} years`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Years to Separation: ${dateCalc.derivedYFS.toFixed(2)} years`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Work Life Factor: ${workLifeFactor.toFixed(2)}%`, size: 22 })], spacing: { after: 200 } })
+      );
+
+      // Narratives
+      if (caseInfo.medicalSummary) {
+        sections.push(
+          new Paragraph({ text: 'Medical Summary', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }),
+          new Paragraph({ children: [new TextRun({ text: caseInfo.medicalSummary, size: 22 })], spacing: { after: 200 } })
+        );
+      }
+      if (caseInfo.employmentHistory) {
+        sections.push(
+          new Paragraph({ text: 'Employment History', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }),
+          new Paragraph({ children: [new TextRun({ text: caseInfo.employmentHistory, size: 22 })], spacing: { after: 200 } })
+        );
+      }
+
+      // AEF Table
+      sections.push(
+        new Paragraph({ text: 'ADJUSTED EARNINGS FACTOR (AEF)', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+        new DocxTable({
+          rows: [
+            createTableRow(['Component', 'Value', 'Cumulative'], true),
+            createTableRow(['Work Life Factor (WLF)', algebraic.wlf.toFixed(4), algebraic.wlf.toFixed(4)]),
+            createTableRow(['Net Unemployment Factor', algebraic.unempFactor.toFixed(4), (algebraic.wlf * algebraic.unempFactor).toFixed(4)]),
+            createTableRow(['After-Tax Factor', algebraic.afterTaxFactor.toFixed(4), (algebraic.wlf * algebraic.unempFactor * algebraic.afterTaxFactor).toFixed(4)]),
+            createTableRow(['Fringe Benefit Factor', algebraic.fringeFactor.toFixed(4), algebraic.fullMultiplier.toFixed(5)])
+          ],
+          width: { size: 100, type: WidthType.PERCENTAGE }
+        })
+      );
+
+      // Economic Variables
+      sections.push(
+        new Paragraph({ text: 'ECONOMIC VARIABLES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+        new Paragraph({ children: [new TextRun({ text: `Wage Growth Rate: ${earningsParams.wageGrowth}%`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Discount Rate: ${earningsParams.discountRate}%`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Unemployment Rate: ${earningsParams.unemploymentRate}%`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `UI Replacement Rate: ${earningsParams.uiReplacementRate}%`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Federal Tax Rate: ${earningsParams.fedTaxRate}%`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `State Tax Rate: ${earningsParams.stateTaxRate}%`, size: 22 })], spacing: { after: 100 } }),
+        new Paragraph({ children: [new TextRun({ text: `Combined Tax Rate: ${fmtPct(algebraic.combinedTaxRate)}`, size: 22 })], spacing: { after: 200 } })
+      );
+
+      const doc = new Document({
+        sections: [{ children: sections }]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const filename = `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}_${caseInfo.reportDate || new Date().toISOString().split('T')[0]}.docx`;
+      saveAs(blob, filename);
+    } catch (error) {
+      console.error('Word export error:', error);
+    } finally {
+      setIsExportingWord(false);
+    }
+  }, [caseInfo, dateCalc, earningsParams, algebraic, projection, hhServices, hhsData, lcpItems, lcpData, grandTotal, workLifeFactor, fmtUSD, fmtPct]);
+
+  return (
+    <div className="text-center print:hidden mt-12 flex flex-col sm:flex-row gap-3 justify-center">
+      <button 
+        onClick={() => window.print()} 
+        className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2 mx-auto sm:mx-0 transition-all active:scale-95"
+      >
+        <FileText className="w-5 h-5" /> Print
+      </button>
+      <button 
+        onClick={handleExportPdf}
+        disabled={isExportingPdf}
+        className="bg-rose-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center gap-2 mx-auto sm:mx-0 transition-all active:scale-95 disabled:opacity-50"
+      >
+        {isExportingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
+        {isExportingPdf ? 'Exporting...' : 'Export PDF'}
+      </button>
+      <button 
+        onClick={handleExportWord}
+        disabled={isExportingWord}
+        className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center gap-2 mx-auto sm:mx-0 transition-all active:scale-95 disabled:opacity-50"
+      >
+        {isExportingWord ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+        {isExportingWord ? 'Exporting...' : 'Export Word'}
+      </button>
+    </div>
+  );
+};
+
 // --- MAIN APPLICATION ---
 export default function ForensicSuite() {
   const [activeTab, setActiveTab] = useState('analysis');
@@ -212,6 +454,7 @@ export default function ForensicSuite() {
   const [strictAlgebraicMode] = useState(true);
   const [isUnionMode, setIsUnionMode] = useState(false);
   const [copySuccess, setCopySuccess] = useState('');
+  const reportRef = useRef<HTMLDivElement>(null);
 
   // --- PERSISTENT STATE ---
   const [caseInfo, setCaseInfo] = useState<CaseInfo>(() => {
@@ -902,7 +1145,7 @@ export default function ForensicSuite() {
 
         {/* --- TAB: REPORT --- */}
         {activeTab === 'report' && (
-          <div className="bg-white shadow-2xl max-w-[21cm] mx-auto min-h-[29.7cm] p-[1.5cm] print:shadow-none print:p-0 print:w-full animate-fade-in text-slate-900 text-[11pt] leading-relaxed">
+          <div ref={reportRef} className="bg-white shadow-2xl max-w-[21cm] mx-auto min-h-[29.7cm] p-[1.5cm] print:shadow-none print:p-0 print:w-full animate-fade-in text-slate-900 text-[11pt] leading-relaxed">
             
             {/* COVER PAGE HEADER */}
             <div className="text-center mb-8 pb-6 border-b-2 border-slate-900">
@@ -1368,12 +1611,24 @@ export default function ForensicSuite() {
               </p>
             </section>
 
-            {/* PRINT BUTTON */}
-            <div className="text-center print:hidden mt-12">
-              <button onClick={() => window.print()} className="bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2 mx-auto transform transition-all active:scale-95">
-                <FileText className="w-5 h-5" /> Print Official Report
-              </button>
-            </div>
+            {/* EXPORT BUTTONS */}
+            <ExportButtons 
+              reportRef={reportRef}
+              caseInfo={caseInfo}
+              dateCalc={dateCalc}
+              earningsParams={earningsParams}
+              algebraic={algebraic}
+              projection={projection}
+              hhServices={hhServices}
+              hhsData={hhsData}
+              lcpItems={lcpItems}
+              lcpData={lcpData}
+              isUnionMode={isUnionMode}
+              grandTotal={grandTotal}
+              workLifeFactor={workLifeFactor}
+              fmtUSD={fmtUSD}
+              fmtPct={fmtPct}
+            />
           </div>
         )}
 
