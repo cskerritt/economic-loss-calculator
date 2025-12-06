@@ -28,10 +28,25 @@ export interface CaseInfo {
   functionalLimitations: string;
 }
 
+export interface RetirementScenario {
+  id: string;
+  label: string;
+  retirementAge: number | null; // null for WLE-based
+  enabled: boolean;
+  yfs: number; // Years to Final Separation (calculated or manual)
+  wlf: number; // Work Life Factor (calculated)
+}
+
 export interface EarningsParams {
   baseEarnings: number;
   residualEarnings: number;
-  wle: number;
+  wle: number; // Work Life Expectancy in years (XX.XX)
+  wleRetirementAge: number; // The age that corresponds to WLE endpoint
+  yfsManual: number; // Manual YFS override if needed
+  useManualYFS: boolean;
+  selectedScenario: string; // Which scenario is active for calculations
+  enablePJI: boolean; // Permanent Job Incapacity option
+  pjiAge: number; // Custom PJI age
   wageGrowth: number;
   discountRate: number;
   fringeRate: number;
@@ -167,6 +182,12 @@ export const DEFAULT_EARNINGS_PARAMS: EarningsParams = {
   baseEarnings: 0,
   residualEarnings: 0,
   wle: 0,
+  wleRetirementAge: 67,
+  yfsManual: 0,
+  useManualYFS: false,
+  selectedScenario: 'age67',
+  enablePJI: false,
+  pjiAge: 62,
   wageGrowth: 3.50,
   discountRate: 4.25,
   fringeRate: 21.5,
@@ -180,6 +201,13 @@ export const DEFAULT_EARNINGS_PARAMS: EarningsParams = {
   fedTaxRate: 15.0,
   stateTaxRate: 4.5
 };
+
+export const RETIREMENT_SCENARIOS = [
+  { id: 'wle', label: 'WLE-Based', retirementAge: null },
+  { id: 'age65', label: 'Age 65', retirementAge: 65 },
+  { id: 'age67', label: 'Age 67', retirementAge: 67 },
+  { id: 'age70', label: 'Age 70', retirementAge: 70 },
+];
 
 export const DEFAULT_HH_SERVICES: HhServices = {
   active: false,
