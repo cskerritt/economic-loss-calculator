@@ -1,18 +1,19 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Sigma, User, Briefcase, BookOpen, Home, HeartPulse, FileText, BarChart3,
-  Download, FileDown, Loader2, Menu, X
+  Menu, X
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 
-import { WizardNavigation, WizardStep } from './forensic/WizardNavigation';
+import { WizardNavigation, WizardStep, StepCompletion } from './forensic/WizardNavigation';
+import { CaseManager, SavedCase, getDefaultCaseData } from './forensic/CaseManager';
 import { 
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData,
-  DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES, CPI_CATEGORIES
+  DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
 } from './forensic/types';
-import { CaseInfoStep, EarningsStep, NarrativesStep, HouseholdStep, LCPStep, SummaryStep } from './forensic/steps';
+import { CaseInfoStep, EarningsStep, NarrativesStep, HouseholdStep, LCPStep, SummaryStep, ReportStep } from './forensic/steps';
 
 // Wizard Steps Configuration
 const WIZARD_STEPS: WizardStep[] = [
@@ -65,6 +66,55 @@ export default function ForensicSuite() {
   useEffect(() => { localStorage.setItem('fs_lcp_v10', JSON.stringify(lcpItems)); }, [lcpItems]);
   useEffect(() => { localStorage.setItem('fs_past_actuals_v10', JSON.stringify(pastActuals)); }, [pastActuals]);
   useEffect(() => { localStorage.setItem('fs_hhs_v10', JSON.stringify(hhServices)); }, [hhServices]);
+
+  // Step Completion Calculation
+  const stepCompletion: StepCompletion = useMemo(() => {
+    const caseFields = [caseInfo.plaintiff, caseInfo.dob, caseInfo.dateOfInjury, caseInfo.dateOfTrial, caseInfo.gender];
+    const caseFilled = caseFields.filter(f => f && f.toString().trim()).length;
+
+    const earningsFields = [earningsParams.baseEarnings, earningsParams.wle];
+    const earningsFilled = earningsFields.filter(f => f > 0).length;
+
+    const narrativeFields = [caseInfo.medicalSummary, caseInfo.employmentHistory, caseInfo.preInjuryCapacity];
+    const narrativesFilled = narrativeFields.filter(f => f && f.trim()).length;
+
+    const householdFilled = hhServices.active ? (hhServices.hoursPerWeek > 0 ? 1 : 0) : 1;
+    const householdTotal = 1;
+
+    const lcpFilled = lcpItems.length > 0 ? 1 : 0;
+
+    return {
+      case: { filled: caseFilled, total: caseFields.length, percentage: (caseFilled / caseFields.length) * 100 },
+      earnings: { filled: earningsFilled, total: earningsFields.length, percentage: (earningsFilled / earningsFields.length) * 100 },
+      narratives: { filled: narrativesFilled, total: narrativeFields.length, percentage: (narrativesFilled / narrativeFields.length) * 100 },
+      household: { filled: householdFilled, total: householdTotal, percentage: householdFilled * 100 },
+      lcp: { filled: lcpFilled, total: 1, percentage: lcpFilled * 100 },
+      summary: { filled: 1, total: 1, percentage: 100 },
+      report: { filled: 1, total: 1, percentage: 100 },
+    };
+  }, [caseInfo, earningsParams, hhServices, lcpItems]);
+
+  // Case Management Handlers
+  const handleLoadCase = (savedCase: SavedCase) => {
+    setCaseInfo(savedCase.caseInfo);
+    setEarningsParams(savedCase.earningsParams);
+    setHhServices(savedCase.hhServices);
+    setLcpItems(savedCase.lcpItems);
+    setPastActuals(savedCase.pastActuals);
+    setIsUnionMode(savedCase.isUnionMode);
+    setCurrentStep(0);
+  };
+
+  const handleNewCase = () => {
+    const defaults = getDefaultCaseData();
+    setCaseInfo(defaults.caseInfo);
+    setEarningsParams(defaults.earningsParams);
+    setHhServices(defaults.hhServices);
+    setLcpItems(defaults.lcpItems);
+    setPastActuals(defaults.pastActuals);
+    setIsUnionMode(defaults.isUnionMode);
+    setCurrentStep(0);
+  };
 
   // Date Calculations
   const dateCalc: DateCalc = useMemo(() => {
@@ -211,8 +261,8 @@ export default function ForensicSuite() {
     return { items: processed, totalNom, totalPV };
   }, [lcpItems, earningsParams.discountRate]);
 
-  const fmtUSD = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
-  const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
+  const fmtUSD = useCallback((n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n), []);
+  const fmtPct = useCallback((n: number) => `${(n * 100).toFixed(2)}%`, []);
   const grandTotal = projection.totalPastLoss + projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV;
 
   const handleExportPdf = useCallback(async () => {
@@ -268,45 +318,28 @@ export default function ForensicSuite() {
         return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
       case 'report':
         return (
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8 print:hidden">
-              <h2 className="text-2xl font-bold text-foreground">Generate Report</h2>
-              <p className="text-muted-foreground mt-1">Export your economic appraisal report</p>
-              <div className="flex gap-3 justify-center mt-6">
-                <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2">
-                  <FileText className="w-5 h-5" /> Print
-                </button>
-                <button onClick={handleExportPdf} disabled={isExportingPdf} className="bg-rose-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center gap-2 disabled:opacity-50">
-                  {isExportingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
-                  {isExportingPdf ? 'Exporting...' : 'Export PDF'}
-                </button>
-                <button onClick={handleExportWord} disabled={isExportingWord} className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50">
-                  {isExportingWord ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                  {isExportingWord ? 'Exporting...' : 'Export Word'}
-                </button>
-              </div>
-            </div>
-            <div ref={reportRef} className="bg-white text-slate-900 p-8 shadow-lg rounded-lg print:shadow-none print:rounded-none">
-              <header className="text-center mb-8 border-b-2 border-slate-900 pb-6">
-                <h1 className="text-2xl font-bold uppercase tracking-wide">Appraisal of Economic Loss</h1>
-                <p className="text-sm mt-2">Prepared for: {caseInfo.attorney} — {caseInfo.lawFirm}</p>
-                <p className="text-sm">Regarding: {caseInfo.plaintiff}</p>
-                <p className="text-sm">Report Date: {caseInfo.reportDate ? new Date(caseInfo.reportDate).toLocaleDateString() : 'N/A'}</p>
-              </header>
-              <section className="mb-6">
-                <h2 className="text-lg font-bold border-b border-slate-300 pb-2 mb-4">Opinion of Economic Losses</h2>
-                <table className="w-full text-sm border-collapse">
-                  <thead><tr className="bg-slate-100"><th className="p-2 text-left border">Category</th><th className="p-2 text-right border">Past</th><th className="p-2 text-right border">Future (PV)</th><th className="p-2 text-right border">Total</th></tr></thead>
-                  <tbody>
-                    <tr><td className="p-2 border">Lost Earning Capacity</td><td className="p-2 border text-right">{fmtUSD(projection.totalPastLoss)}</td><td className="p-2 border text-right">{fmtUSD(projection.totalFuturePV)}</td><td className="p-2 border text-right font-bold">{fmtUSD(projection.totalPastLoss + projection.totalFuturePV)}</td></tr>
-                    {hhServices.active && <tr><td className="p-2 border">Household Services</td><td className="p-2 border text-right">—</td><td className="p-2 border text-right">{fmtUSD(hhsData.totalPV)}</td><td className="p-2 border text-right font-bold">{fmtUSD(hhsData.totalPV)}</td></tr>}
-                    {lcpItems.length > 0 && <tr><td className="p-2 border">Life Care Plan</td><td className="p-2 border text-right">—</td><td className="p-2 border text-right">{fmtUSD(lcpData.totalPV)}</td><td className="p-2 border text-right font-bold">{fmtUSD(lcpData.totalPV)}</td></tr>}
-                    <tr className="bg-slate-100 font-bold"><td className="p-2 border">GRAND TOTAL</td><td className="p-2 border text-right">{fmtUSD(projection.totalPastLoss)}</td><td className="p-2 border text-right">{fmtUSD(projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV)}</td><td className="p-2 border text-right text-lg">{fmtUSD(grandTotal)}</td></tr>
-                  </tbody>
-                </table>
-              </section>
-            </div>
-          </div>
+          <ReportStep
+            reportRef={reportRef}
+            caseInfo={caseInfo}
+            earningsParams={earningsParams}
+            hhServices={hhServices}
+            lcpItems={lcpItems}
+            dateCalc={dateCalc}
+            algebraic={algebraic}
+            projection={projection}
+            hhsData={hhsData}
+            lcpData={lcpData}
+            workLifeFactor={workLifeFactor}
+            grandTotal={grandTotal}
+            isUnionMode={isUnionMode}
+            isExportingPdf={isExportingPdf}
+            isExportingWord={isExportingWord}
+            onPrint={() => window.print()}
+            onExportPdf={handleExportPdf}
+            onExportWord={handleExportWord}
+            fmtUSD={fmtUSD}
+            fmtPct={fmtPct}
+          />
         );
       default:
         return null;
@@ -326,9 +359,18 @@ export default function ForensicSuite() {
               <h1 className="font-bold text-lg tracking-tight">ForensicSuite <span className="text-indigo-light font-light">V10</span></h1>
             </div>
           </div>
-          <div className="hidden md:block text-sm text-muted-foreground">
-            Step {currentStep + 1} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep].label}
+          
+          <div className="hidden md:flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              Step {currentStep + 1} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep].label}
+            </span>
+            <CaseManager
+              currentCase={{ caseInfo, earningsParams, hhServices, lcpItems, pastActuals, isUnionMode }}
+              onLoadCase={handleLoadCase}
+              onNewCase={handleNewCase}
+            />
           </div>
+          
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2">
             {mobileMenuOpen ? <X /> : <Menu />}
           </button>
@@ -338,6 +380,13 @@ export default function ForensicSuite() {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-navy-light border-t border-navy p-4 space-y-2 print:hidden">
+          <div className="mb-4">
+            <CaseManager
+              currentCase={{ caseInfo, earningsParams, hhServices, lcpItems, pastActuals, isUnionMode }}
+              onLoadCase={handleLoadCase}
+              onNewCase={handleNewCase}
+            />
+          </div>
           {WIZARD_STEPS.map((step, idx) => (
             <button key={step.id} onClick={() => { setCurrentStep(idx); setMobileMenuOpen(false); }} className={`block w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${currentStep === idx ? 'bg-indigo text-primary-foreground' : 'text-muted-foreground hover:bg-navy'}`}>
               {step.label}
@@ -349,7 +398,8 @@ export default function ForensicSuite() {
       {/* Wizard Navigation */}
       <WizardNavigation 
         steps={WIZARD_STEPS} 
-        currentStep={currentStep} 
+        currentStep={currentStep}
+        stepCompletion={stepCompletion}
         onStepClick={setCurrentStep}
         onNext={() => setCurrentStep(Math.min(currentStep + 1, WIZARD_STEPS.length - 1))}
         onPrevious={() => setCurrentStep(Math.max(currentStep - 1, 0))}

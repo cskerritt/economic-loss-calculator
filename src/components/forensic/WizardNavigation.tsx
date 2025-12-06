@@ -1,15 +1,24 @@
 import React from 'react';
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 
 export interface WizardStep {
   id: string;
   label: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
+}
+
+export interface StepCompletion {
+  [stepId: string]: {
+    filled: number;
+    total: number;
+    percentage: number;
+  };
 }
 
 interface WizardNavigationProps {
   steps: WizardStep[];
   currentStep: number;
+  stepCompletion: StepCompletion;
   onStepClick: (index: number) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -18,6 +27,7 @@ interface WizardNavigationProps {
 export const WizardNavigation: React.FC<WizardNavigationProps> = ({
   steps,
   currentStep,
+  stepCompletion,
   onStepClick,
   onNext,
   onPrevious
@@ -30,39 +40,74 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
           {steps.map((step, index) => {
             const Icon = step.icon;
             const isActive = index === currentStep;
-            const isCompleted = index < currentStep;
+            const completion = stepCompletion[step.id];
+            const isComplete = completion?.percentage >= 100;
+            const hasProgress = completion?.percentage > 0 && completion?.percentage < 100;
             
             return (
               <React.Fragment key={step.id}>
                 <button
                   onClick={() => onStepClick(index)}
                   className={`flex flex-col items-center min-w-[80px] transition-all ${
-                    isActive 
-                      ? 'scale-105' 
-                      : 'opacity-60 hover:opacity-100'
+                    isActive ? 'scale-105' : 'opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <div className={`
-                    w-10 h-10 rounded-full flex items-center justify-center mb-1 transition-all
-                    ${isActive 
-                      ? 'bg-primary text-primary-foreground shadow-lg' 
-                      : isCompleted 
-                        ? 'bg-emerald-500 text-white' 
-                        : 'bg-muted text-muted-foreground'
-                    }
-                  `}>
-                    {isCompleted ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                  <div className="relative">
+                    {/* Progress Ring */}
+                    {hasProgress && (
+                      <svg className="absolute inset-0 w-10 h-10 -rotate-90">
+                        <circle
+                          cx="20"
+                          cy="20"
+                          r="18"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          fill="none"
+                          className="text-muted"
+                        />
+                        <circle
+                          cx="20"
+                          cy="20"
+                          r="18"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          fill="none"
+                          strokeDasharray={`${(completion.percentage / 100) * 113} 113`}
+                          className="text-amber-500"
+                        />
+                      </svg>
+                    )}
+                    <div className={`
+                      w-10 h-10 rounded-full flex items-center justify-center mb-1 transition-all relative z-10
+                      ${isActive 
+                        ? 'bg-primary text-primary-foreground shadow-lg' 
+                        : isComplete
+                          ? 'bg-emerald-500 text-white' 
+                          : hasProgress
+                            ? 'bg-amber-500/20 text-amber-600 border-2 border-amber-500'
+                            : 'bg-muted text-muted-foreground'
+                      }
+                    `}>
+                      {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                    </div>
                   </div>
                   <span className={`text-[10px] font-medium uppercase tracking-wide ${
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   }`}>
                     {step.label}
                   </span>
+                  {completion && (
+                    <span className={`text-[9px] ${
+                      isComplete ? 'text-emerald-500' : hasProgress ? 'text-amber-500' : 'text-muted-foreground'
+                    }`}>
+                      {completion.filled}/{completion.total}
+                    </span>
+                  )}
                 </button>
                 
                 {index < steps.length - 1 && (
-                  <div className={`h-0.5 w-8 mx-1 ${
-                    index < currentStep ? 'bg-emerald-500' : 'bg-border'
+                  <div className={`h-0.5 w-8 mx-1 transition-colors ${
+                    stepCompletion[steps[index].id]?.percentage >= 100 ? 'bg-emerald-500' : 'bg-border'
                   }`} />
                 )}
               </React.Fragment>
