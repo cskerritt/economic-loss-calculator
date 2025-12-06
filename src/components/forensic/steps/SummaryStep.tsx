@@ -56,7 +56,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   const [copySuccess, setCopySuccess] = React.useState('');
 
   const copyTable = () => {
-    const txt = projection.futureSchedule.map(r => `${r.year}\t${r.gross.toFixed(2)}\t${r.netLoss.toFixed(2)}\t${r.pv.toFixed(2)}`).join('\n');
+    const txt = projection.futureSchedule.map(r => `${r.year}\t${(r.gross ?? 0).toFixed(2)}\t${(r.netLoss ?? 0).toFixed(2)}\t${(r.pv ?? 0).toFixed(2)}`).join('\n');
     navigator.clipboard.writeText(`Year\tGross\tNetLoss\tPV\n${txt}`);
     setCopySuccess('Copied!');
     setTimeout(() => setCopySuccess(''), 2000);
