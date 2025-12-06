@@ -416,10 +416,10 @@ export default function ForensicSuite() {
         new TableRow({
           children: [
             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: scenario.label + (scenario.id === earningsParams.selectedScenario ? ' (ACTIVE)' : ''), size: 20 })] })] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: scenario.retirementAge.toFixed(1), size: 20 })] })] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: scenario.yfs.toFixed(2), size: 20 })] })] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${scenario.wlfPercent.toFixed(2)}%`, size: 20 })] })] }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: fmtUSD(scenario.grandTotal), bold: true, size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: (scenario.retirementAge ?? 0).toFixed(1), size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: (scenario.yfs ?? 0).toFixed(2), size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${(scenario.wlfPercent ?? 0).toFixed(2)}%`, size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: fmtUSD(scenario.grandTotal ?? 0), bold: true, size: 20 })] })] }),
           ]
         })
       );

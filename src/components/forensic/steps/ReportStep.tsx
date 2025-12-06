@@ -161,8 +161,8 @@ export const ReportStep: React.FC<ReportStepProps> = ({
             <p><strong>Age at Injury:</strong> {dateCalc.ageInjury} years</p>
             <p><strong>Life Expectancy:</strong> {caseInfo.lifeExpectancy} years</p>
             <p><strong>Work Life Expectancy:</strong> {earningsParams.wle} years</p>
-            <p><strong>Years to Separation:</strong> {dateCalc.derivedYFS.toFixed(2)} years</p>
-            <p><strong>Work Life Factor:</strong> {workLifeFactor.toFixed(2)}%</p>
+            <p><strong>Years to Separation:</strong> {(dateCalc.derivedYFS ?? 0).toFixed(2)} years</p>
+            <p><strong>Work Life Factor:</strong> {(workLifeFactor ?? 0).toFixed(2)}%</p>
           </div>
           
           {caseInfo.medicalSummary && (
@@ -205,23 +205,23 @@ export const ReportStep: React.FC<ReportStepProps> = ({
             <tbody>
               <tr>
                 <td className="p-2 border border-slate-300">Work Life Factor (WLF)</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.wlf.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.wlf.toFixed(4)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.wlf ?? 0).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.wlf ?? 0).toFixed(4)}</td>
               </tr>
               <tr>
                 <td className="p-2 border border-slate-300">Net Unemployment Factor</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.unempFactor.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.wlf * algebraic.unempFactor).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.unempFactor ?? 0).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{((algebraic.wlf ?? 0) * (algebraic.unempFactor ?? 0)).toFixed(4)}</td>
               </tr>
               <tr>
                 <td className="p-2 border border-slate-300">After-Tax Factor</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.afterTaxFactor.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.wlf * algebraic.unempFactor * algebraic.afterTaxFactor).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.afterTaxFactor ?? 0).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{((algebraic.wlf ?? 0) * (algebraic.unempFactor ?? 0) * (algebraic.afterTaxFactor ?? 0)).toFixed(4)}</td>
               </tr>
               <tr>
                 <td className="p-2 border border-slate-300">Fringe Benefit Factor</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.fringeFactor.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono font-bold">{algebraic.fullMultiplier.toFixed(5)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.fringeFactor ?? 0).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300 text-right font-mono font-bold">{(algebraic.fullMultiplier ?? 0).toFixed(5)}</td>
               </tr>
             </tbody>
           </table>
@@ -303,9 +303,9 @@ export const ReportStep: React.FC<ReportStepProps> = ({
                       {scenario.label}
                       {scenario.id === selectedScenario && <span className="ml-1 text-[9px] font-bold">(ACTIVE)</span>}
                     </td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
+                    <td className="p-2 border border-slate-300 text-right font-mono">{(scenario.retirementAge ?? 0).toFixed(1)}</td>
+                    <td className="p-2 border border-slate-300 text-right font-mono">{(scenario.yfs ?? 0).toFixed(2)}</td>
+                    <td className="p-2 border border-slate-300 text-right font-mono">{(scenario.wlfPercent ?? 0).toFixed(2)}%</td>
                     <td className="p-2 border border-slate-300 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
                     <td className="p-2 border border-slate-300 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
                     <td className="p-2 border border-slate-300 text-right font-mono font-bold">{fmtUSD(scenario.grandTotal)}</td>
