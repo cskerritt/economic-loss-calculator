@@ -11,6 +11,8 @@ import { WizardNavigation, WizardStep, StepCompletion } from './forensic/WizardN
 import { CaseManager, SavedCase, getDefaultCaseData } from './forensic/CaseManager';
 import { ThemeToggle } from './ThemeToggle';
 import { ExportHistory, addExportRecord } from './ExportHistory';
+import { DataImport } from './DataImport';
+import { Dashboard } from './Dashboard';
 import { 
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
   DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
@@ -59,6 +61,8 @@ export default function ForensicSuite() {
   const [isExportingWord, setIsExportingWord] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveIndicatorVisible, setSaveIndicatorVisible] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const normalizeLcpItems = useCallback((items: LcpItem[] = []): LcpItem[] => {
     return items.map((item) => {
@@ -456,6 +460,8 @@ export default function ForensicSuite() {
               currentCase={{ caseInfo, earningsParams, hhServices, lcpItems, pastActuals, isUnionMode }}
               onLoadCase={handleLoadCase}
               onNewCase={handleNewCase}
+              onOpenImport={() => setShowImportModal(true)}
+              onOpenDashboard={() => setShowDashboard(true)}
             />
             <ExportHistory fmtUSD={fmtUSD} />
             <ThemeToggle />
@@ -475,6 +481,8 @@ export default function ForensicSuite() {
               currentCase={{ caseInfo, earningsParams, hhServices, lcpItems, pastActuals, isUnionMode }}
               onLoadCase={handleLoadCase}
               onNewCase={handleNewCase}
+              onOpenImport={() => setShowImportModal(true)}
+              onOpenDashboard={() => setShowDashboard(true)}
             />
             <ExportHistory fmtUSD={fmtUSD} />
             <ThemeToggle />
@@ -554,6 +562,26 @@ export default function ForensicSuite() {
         </div>
         {renderStep()}
       </main>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <DataImport
+          onImport={(importedCase) => {
+            handleLoadCase(importedCase);
+            setShowImportModal(false);
+          }}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
+
+      {/* Dashboard Modal */}
+      {showDashboard && (
+        <Dashboard
+          onClose={() => setShowDashboard(false)}
+          onLoadCase={handleLoadCase}
+          fmtUSD={fmtUSD}
+        />
+      )}
     </div>
   );
 }
