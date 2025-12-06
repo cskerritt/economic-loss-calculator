@@ -10,8 +10,8 @@ import { saveAs } from 'file-saver';
 import { WizardNavigation, WizardStep, StepCompletion } from './forensic/WizardNavigation';
 import { CaseManager, SavedCase, getDefaultCaseData } from './forensic/CaseManager';
 import { 
-  CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData,
-  DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
+  CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
+  DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES, RETIREMENT_SCENARIOS
 } from './forensic/types';
 import { CaseInfoStep, EarningsStep, NarrativesStep, HouseholdStep, LCPStep, SummaryStep, ReportStep } from './forensic/steps';
 
@@ -261,6 +261,116 @@ export default function ForensicSuite() {
     return { items: processed, totalNom, totalPV };
   }, [lcpItems, earningsParams.discountRate]);
 
+  // Calculate age at injury for scenario comparisons
+  const ageAtInjury = useMemo(() => {
+    if (!caseInfo.dob || !caseInfo.dateOfInjury) return 0;
+    const dobDate = new Date(caseInfo.dob);
+    const injuryDate = new Date(caseInfo.dateOfInjury);
+    return (injuryDate.getTime() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  }, [caseInfo.dob, caseInfo.dateOfInjury]);
+
+  // Scenario Projections - Calculate damages for all retirement scenarios
+  const scenarioProjections: ScenarioProjection[] = useMemo(() => {
+    if (!caseInfo.dateOfInjury || !caseInfo.dob || ageAtInjury <= 0) return [];
+
+    const calculateScenarioProjection = (
+      scenarioId: string,
+      label: string,
+      retirementAge: number
+    ): ScenarioProjection => {
+      const yfs = Math.max(0, retirementAge - ageAtInjury);
+      const wlf = yfs > 0 ? earningsParams.wle / yfs : 0;
+      const wlfPercent = wlf * 100;
+
+      // Calculate algebraic factors for this scenario
+      const unempFactor = 1 - ((earningsParams.unemploymentRate / 100) * (1 - (earningsParams.uiReplacementRate / 100)));
+      const afterTaxFactor = (1 - (earningsParams.fedTaxRate / 100)) * (1 - (earningsParams.stateTaxRate / 100));
+      let fringeFactor = 1;
+      if (isUnionMode) {
+        const flatFringe = earningsParams.pension + earningsParams.healthWelfare + earningsParams.annuity + earningsParams.clothingAllowance + earningsParams.otherBenefits;
+        fringeFactor = earningsParams.baseEarnings > 0 ? 1 + (flatFringe / earningsParams.baseEarnings) : 1;
+      } else {
+        fringeFactor = 1 + (earningsParams.fringeRate / 100);
+      }
+      const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
+      const realizedMultiplier = afterTaxFactor * fringeFactor;
+
+      // Past losses (same for all scenarios)
+      let totalPastLoss = 0;
+      const startYear = new Date(caseInfo.dateOfInjury).getFullYear();
+      const fullPast = Math.floor(dateCalc.pastYears);
+      const partialPast = dateCalc.pastYears % 1;
+
+      for (let i = 0; i <= fullPast; i++) {
+        const fraction = (i === fullPast && partialPast > 0) ? partialPast : (i === fullPast && partialPast === 0 ? 0 : 1);
+        if (fraction <= 0) continue;
+
+        const currentYear = startYear + i;
+        const growth = Math.pow(1 + (earningsParams.wageGrowth / 100), i);
+        const grossBase = earningsParams.baseEarnings * growth * fraction;
+        const netButFor = grossBase * fullMultiplier;
+
+        let netActual = 0;
+        if (pastActuals[currentYear] !== undefined && pastActuals[currentYear] !== "") {
+          const grossActual = parseFloat(pastActuals[currentYear]);
+          netActual = grossActual * realizedMultiplier;
+        } else {
+          const grossActual = earningsParams.residualEarnings * growth * fraction;
+          netActual = grossActual * fullMultiplier;
+        }
+        totalPastLoss += (netButFor - netActual);
+      }
+
+      // Future losses with scenario-specific YFS
+      let totalFuturePV = 0;
+      const futureYears = Math.ceil(yfs);
+      for (let i = 0; i < futureYears; i++) {
+        const growth = Math.pow(1 + (earningsParams.wageGrowth / 100), i);
+        const discount = 1 / Math.pow(1 + (earningsParams.discountRate / 100), i + 0.5);
+        const grossBase = earningsParams.baseEarnings * growth;
+        const netButFor = grossBase * fullMultiplier;
+        const grossRes = earningsParams.residualEarnings * growth;
+        const netActual = grossRes * fullMultiplier;
+        const netLoss = netButFor - netActual;
+        totalFuturePV += (netLoss * discount);
+      }
+
+      const totalEarningsLoss = totalPastLoss + totalFuturePV;
+      const grandTotal = totalEarningsLoss + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV;
+
+      return {
+        id: scenarioId,
+        label,
+        retirementAge,
+        yfs,
+        wlf,
+        wlfPercent,
+        totalPastLoss,
+        totalFuturePV,
+        totalEarningsLoss,
+        grandTotal
+      };
+    };
+
+    const scenarios: ScenarioProjection[] = [];
+
+    // WLE-based scenario
+    const wleRetAge = ageAtInjury + earningsParams.wle;
+    scenarios.push(calculateScenarioProjection('wle', `WLE (Age ${wleRetAge.toFixed(1)})`, wleRetAge));
+
+    // Standard age scenarios
+    for (const scenario of RETIREMENT_SCENARIOS.filter(s => s.retirementAge !== null)) {
+      scenarios.push(calculateScenarioProjection(scenario.id, scenario.label, scenario.retirementAge!));
+    }
+
+    // PJI scenario if enabled
+    if (earningsParams.enablePJI) {
+      scenarios.push(calculateScenarioProjection('pji', `PJI (Age ${earningsParams.pjiAge})`, earningsParams.pjiAge));
+    }
+
+    return scenarios;
+  }, [caseInfo.dateOfInjury, caseInfo.dob, ageAtInjury, earningsParams, isUnionMode, dateCalc.pastYears, pastActuals, hhServices.active, hhsData.totalPV, lcpData.totalPV]);
+
   const fmtUSD = useCallback((n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n), []);
   const fmtPct = useCallback((n: number) => `${(n * 100).toFixed(2)}%`, []);
   const grandTotal = projection.totalPastLoss + projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV;
@@ -315,7 +425,7 @@ export default function ForensicSuite() {
       case 'lcp':
         return <LCPStep lcpItems={lcpItems} setLcpItems={setLcpItems} lcpData={lcpData} lifeExpectancy={caseInfo.lifeExpectancy} fmtUSD={fmtUSD} />;
       case 'summary':
-        return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
+        return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} scenarioProjections={scenarioProjections} selectedScenario={earningsParams.selectedScenario} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
       case 'report':
         return (
           <ReportStep
@@ -334,6 +444,8 @@ export default function ForensicSuite() {
             isUnionMode={isUnionMode}
             isExportingPdf={isExportingPdf}
             isExportingWord={isExportingWord}
+            scenarioProjections={scenarioProjections}
+            selectedScenario={earningsParams.selectedScenario}
             onPrint={() => window.print()}
             onExportPdf={handleExportPdf}
             onExportWord={handleExportWord}
