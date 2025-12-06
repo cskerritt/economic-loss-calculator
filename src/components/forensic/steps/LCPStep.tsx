@@ -9,6 +9,7 @@ interface LCPStepProps {
   lcpData: LcpData;
   lifeExpectancy: number;
   fmtUSD: (n: number) => string;
+  baseYear: number;
 }
 
 export const LCPStep: React.FC<LCPStepProps> = ({ 
@@ -16,8 +17,10 @@ export const LCPStep: React.FC<LCPStepProps> = ({
   setLcpItems, 
   lcpData, 
   lifeExpectancy,
-  fmtUSD 
+  fmtUSD,
+  baseYear
 }) => {
+  const safeBaseYear = Number.isFinite(baseYear) ? baseYear : new Date().getFullYear();
   const addItem = () => {
     const defaultDuration = Math.max(1, Math.ceil(lifeExpectancy || 25));
     const startYear = 1;
@@ -76,6 +79,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                 const endYear = Math.max(startYear, item.endYear || startYear + item.duration - 1);
                 const duration = Math.max(1, endYear - startYear + 1);
                 const yearRange = Array.from({ length: Math.min(200, duration) }, (_, idx) => startYear + idx);
+                const calendarRange = yearRange.map((yr) => safeBaseYear + (yr - 1));
                 const updateItem = (changes: Partial<LcpItem>) => setLcpItems(lcpItems.map(i => i.id === item.id ? { ...i, ...changes } : i));
                 return (
                   <div key={item.id} className="relative bg-card border border-border p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow">
@@ -204,7 +208,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                             <span className="text-sm font-medium">Use manual year selection</span>
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Range: Years {startYear}–{endYear} ({duration} total)
+                            Range: Years {startYear}–{endYear} ({duration} total) • Calendar: {calendarRange[0]}–{calendarRange[calendarRange.length - 1]}
                           </div>
                         </div>
 
@@ -235,8 +239,9 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                               </button>
                             </div>
                             <div className="max-h-40 overflow-y-auto grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 text-xs">
-                              {yearRange.map((year) => {
+                              {yearRange.map((year, idx) => {
                                 const checked = item.customYears.includes(year);
+                                const calendarYear = calendarRange[idx];
                                 return (
                                   <label key={year} className="flex items-center gap-2 bg-background border border-border rounded-md px-2 py-1">
                                     <input
@@ -249,7 +254,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                                         updateItem({ customYears: next });
                                       }}
                                     />
-                                    <span>Year {year}</span>
+                                    <span>{calendarYear}</span>
                                   </label>
                                 );
                               })}
