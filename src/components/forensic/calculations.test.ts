@@ -170,8 +170,11 @@ describe("computeLcpData", () => {
         freqType: "annual",
         duration: 2,
         startYear: 1,
+        endYear: 2,
         cpi: 2,
         recurrenceInterval: 1,
+        useCustomYears: false,
+        customYears: [],
       },
       {
         id: 2,
@@ -181,8 +184,11 @@ describe("computeLcpData", () => {
         freqType: "onetime",
         duration: 3,
         startYear: 1,
+        endYear: 1,
         cpi: 0,
         recurrenceInterval: 1,
+        useCustomYears: false,
+        customYears: [],
       },
       {
         id: 3,
@@ -192,8 +198,11 @@ describe("computeLcpData", () => {
         freqType: "recurring",
         duration: 4,
         startYear: 1,
+        endYear: 4,
         cpi: 0,
         recurrenceInterval: 2,
+        useCustomYears: false,
+        customYears: [],
       },
     ];
 
@@ -216,6 +225,32 @@ describe("computeLcpData", () => {
     expect(recurring.totalPV).toBeCloseTo(recurringPV, 6);
 
     expect(result.totalPV).toBeCloseTo(annualItem.totalPV + oneTime.totalPV + recurring.totalPV, 6);
+  });
+
+  it("supports manual custom years and clamps start/end years", () => {
+    const items = [
+      {
+        id: 10,
+        categoryId: "therapy",
+        name: "Custom year therapy",
+        baseCost: 1000,
+        freqType: "annual",
+        duration: 5,
+        startYear: 0, // should clamp to year 1
+        endYear: 10, // extended range, but custom years drive inclusion
+        cpi: 0,
+        recurrenceInterval: 1,
+        useCustomYears: true,
+        customYears: [1, 3, 5],
+      },
+    ];
+
+    const result = computeLcpData(items, 0);
+    const item = result.items[0];
+    expect(item.totalNom).toBe(3000);
+    expect(item.totalPV).toBeCloseTo(3000, 6);
+    expect(item.totalPV).toBeLessThan(result.totalNom + 1e-6);
+    expect(result.totalPV).toBeCloseTo(3000, 6);
   });
 });
 
