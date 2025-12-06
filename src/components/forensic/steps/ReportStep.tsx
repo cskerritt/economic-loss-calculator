@@ -278,7 +278,7 @@ export const ReportStep: React.FC<ReportStepProps> = ({
         )}
 
         {/* Retirement Scenario Comparison */}
-        {scenarioProjections.length > 0 && (
+        {scenarioProjections.filter(s => s.included).length > 0 && (
           <section className="mb-8">
             <h2 className="text-lg font-bold uppercase border-b-2 border-slate-900 pb-2 mb-4">Retirement Scenario Analysis</h2>
             <p className="mb-4 text-sm">
@@ -297,7 +297,7 @@ export const ReportStep: React.FC<ReportStepProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {scenarioProjections.map(scenario => (
+                {scenarioProjections.filter(s => s.included).map(scenario => (
                   <tr key={scenario.id} className={scenario.id === selectedScenario ? 'bg-slate-100' : ''}>
                     <td className="p-2 border border-slate-300">
                       {scenario.label}

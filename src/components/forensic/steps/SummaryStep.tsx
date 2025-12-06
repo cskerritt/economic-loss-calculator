@@ -1,7 +1,9 @@
 import React from 'react';
-import { Table, Copy, Check, Target } from 'lucide-react';
+import { Table, Copy, Check, Target, BarChart3 } from 'lucide-react';
 import { Card } from '../ui';
 import { Projection, HhServices, HhsData, LcpData, Algebraic, ScenarioProjection } from '../types';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { Checkbox } from '../../../components/ui/checkbox';
 
 interface SummaryStepProps {
   projection: Projection;
@@ -13,6 +15,7 @@ interface SummaryStepProps {
   grandTotal: number;
   scenarioProjections: ScenarioProjection[];
   selectedScenario: string;
+  onToggleScenarioIncluded: (id: string) => void;
   fmtUSD: (n: number) => string;
   fmtPct: (n: number) => string;
 }
@@ -27,6 +30,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   grandTotal,
   scenarioProjections,
   selectedScenario,
+  onToggleScenarioIncluded,
   fmtUSD,
   fmtPct
 }) => {
@@ -129,55 +133,135 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
 
       {/* Retirement Scenario Comparison */}
       {scenarioProjections.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="bg-muted border-b border-border p-3 flex items-center gap-2">
-            <Target className="w-4 h-4 text-amber-500" />
-            <span className="text-sm font-bold uppercase text-muted-foreground">Retirement Scenario Comparison</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  <th className="p-3 text-left font-bold">Scenario</th>
-                  <th className="p-3 text-right font-bold">Ret. Age</th>
-                  <th className="p-3 text-right font-bold">YFS</th>
-                  <th className="p-3 text-right font-bold">WLF</th>
-                  <th className="p-3 text-right font-bold">Past Loss</th>
-                  <th className="p-3 text-right font-bold">Future (PV)</th>
-                  <th className="p-3 text-right font-bold">Earnings Total</th>
-                  <th className="p-3 text-right font-bold bg-primary/10">Grand Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {scenarioProjections.map(scenario => (
-                  <tr 
-                    key={scenario.id} 
-                    className={scenario.id === selectedScenario ? 'bg-primary/10' : 'hover:bg-muted/50'}
-                  >
-                    <td className="p-3 text-left">
-                      <span className={scenario.id === selectedScenario ? 'font-bold text-primary' : ''}>
-                        {scenario.label}
-                      </span>
-                      {scenario.id === selectedScenario && (
-                        <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
-                    <td className="p-3 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
-                    <td className="p-3 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
-                    <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
-                    <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
-                    <td className="p-3 text-right font-mono font-bold">{fmtUSD(scenario.totalEarningsLoss)}</td>
-                    <td className="p-3 text-right font-mono font-bold text-primary bg-primary/5">{fmtUSD(scenario.grandTotal)}</td>
+        <>
+          <Card className="overflow-hidden">
+            <div className="bg-muted border-b border-border p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-bold uppercase text-muted-foreground">Retirement Scenario Comparison</span>
+              </div>
+              <span className="text-xs text-muted-foreground">Check scenarios to include in report</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-muted text-muted-foreground">
+                  <tr>
+                    <th className="p-3 text-center font-bold w-12">Include</th>
+                    <th className="p-3 text-left font-bold">Scenario</th>
+                    <th className="p-3 text-right font-bold">Ret. Age</th>
+                    <th className="p-3 text-right font-bold">YFS</th>
+                    <th className="p-3 text-right font-bold">WLF</th>
+                    <th className="p-3 text-right font-bold">Past Loss</th>
+                    <th className="p-3 text-right font-bold">Future (PV)</th>
+                    <th className="p-3 text-right font-bold">Earnings Total</th>
+                    <th className="p-3 text-right font-bold bg-primary/10">Grand Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
-            <strong>Note:</strong> Grand Total includes earnings loss, household services (if enabled), and life care plan costs. The active scenario is highlighted and used for primary damage calculations.
-          </div>
-        </Card>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {scenarioProjections.map(scenario => (
+                    <tr 
+                      key={scenario.id} 
+                      className={scenario.id === selectedScenario ? 'bg-primary/10' : 'hover:bg-muted/50'}
+                    >
+                      <td className="p-3 text-center">
+                        <Checkbox
+                          checked={scenario.included}
+                          onCheckedChange={() => onToggleScenarioIncluded(scenario.id)}
+                          className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                        />
+                      </td>
+                      <td className="p-3 text-left">
+                        <span className={scenario.id === selectedScenario ? 'font-bold text-primary' : ''}>
+                          {scenario.label}
+                        </span>
+                        {scenario.id === selectedScenario && (
+                          <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
+                      <td className="p-3 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
+                      <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
+                      <td className="p-3 text-right font-mono font-bold">{fmtUSD(scenario.totalEarningsLoss)}</td>
+                      <td className="p-3 text-right font-mono font-bold text-primary bg-primary/5">{fmtUSD(scenario.grandTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
+              <strong>Note:</strong> Grand Total includes earnings loss, household services (if enabled), and life care plan costs. Only checked scenarios will appear in the exported report.
+            </div>
+          </Card>
+
+          {/* Bar Chart Visualization */}
+          <Card className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-4 h-4 text-emerald-500" />
+              <h3 className="text-sm font-bold uppercase text-muted-foreground">Grand Total by Retirement Scenario</h3>
+            </div>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={scenarioProjections.map(s => ({
+                    name: s.label,
+                    total: s.grandTotal,
+                    isActive: s.id === selectedScenario,
+                    included: s.included
+                  }))}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                >
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 11 }}
+                    angle={-25}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [fmtUSD(value), 'Grand Total']}
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                    labelStyle={{ fontWeight: 'bold' }}
+                  />
+                  <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                    {scenarioProjections.map((s, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={s.id === selectedScenario ? 'hsl(var(--primary))' : s.included ? '#10b981' : 'hsl(var(--muted-foreground))'}
+                        opacity={s.included ? 1 : 0.4}
+                      />
+                    ))}
+                    <LabelList 
+                      dataKey="total" 
+                      position="top" 
+                      formatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
+                      style={{ fontSize: 10, fill: 'hsl(var(--foreground))' }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex items-center justify-center gap-6 mt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-primary"></div>
+                <span>Active Scenario</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                <span>Included in Report</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-muted-foreground opacity-40"></div>
+                <span>Not Included</span>
+              </div>
+            </div>
+          </Card>
+        </>
       )}
 
       {/* Damage Schedule Table */}

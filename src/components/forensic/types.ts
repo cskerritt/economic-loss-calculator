@@ -137,6 +137,7 @@ export interface ScenarioProjection {
   totalFuturePV: number;
   totalEarningsLoss: number;
   grandTotal: number;
+  included: boolean; // Whether to include in report export
 }
 
 export interface HhsData {
