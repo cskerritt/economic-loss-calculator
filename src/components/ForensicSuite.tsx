@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Sigma, User, Briefcase, BookOpen, Home, HeartPulse, FileText, BarChart3,
-  Menu, X
+  Menu, X, AlertCircle, CheckCircle2, Sparkles
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
@@ -219,6 +219,28 @@ export default function ForensicSuite() {
     setScenarioIncluded(prev => ({ ...prev, [id]: !(prev[id] ?? true) }));
   }, []);
 
+  const essentialChecks = useMemo(
+    () => [
+      { id: 'plaintiff', label: 'Plaintiff name', ok: !!caseInfo.plaintiff.trim(), stepId: 'case' },
+      { id: 'dob', label: 'Date of birth', ok: !!caseInfo.dob, stepId: 'case' },
+      { id: 'injuryDate', label: 'Date of injury', ok: !!caseInfo.dateOfInjury, stepId: 'case' },
+      { id: 'trialDate', label: 'Trial/valuation date', ok: !!caseInfo.dateOfTrial, stepId: 'case' },
+      { id: 'baseEarnings', label: 'Pre-injury earnings', ok: earningsParams.baseEarnings > 0, stepId: 'earnings' },
+      { id: 'residual', label: 'Residual (post-injury) earnings', ok: earningsParams.residualEarnings >= 0, stepId: 'earnings' },
+      { id: 'wle', label: 'Work life expectancy (years)', ok: earningsParams.wle > 0, stepId: 'earnings' },
+    ],
+    [caseInfo.plaintiff, caseInfo.dob, caseInfo.dateOfInjury, caseInfo.dateOfTrial, earningsParams.baseEarnings, earningsParams.residualEarnings, earningsParams.wle],
+  );
+
+  const nextNeededStepIndex = useMemo(() => {
+    const missing = essentialChecks.find((item) => !item.ok);
+    if (!missing) return null;
+    return WIZARD_STEPS.findIndex((s) => s.id === missing.stepId);
+  }, [essentialChecks]);
+
+  const completedEssentials = essentialChecks.filter((item) => item.ok).length;
+  const essentialsTotal = essentialChecks.length;
+
   const fmtUSD = useCallback((n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n), []);
   const fmtPct = useCallback((n: number) => `${(n * 100).toFixed(2)}%`, []);
   const grandTotal = useMemo(
@@ -370,6 +392,58 @@ export default function ForensicSuite() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8 print:p-0">
+        <div className="print:hidden mb-6">
+          <div className="bg-muted border border-border rounded-xl p-4 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground">Quick start checklist</p>
+                  <p className="text-xs text-muted-foreground">
+                    Fill the essentials, then jump to the next step that needs attention.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => nextNeededStepIndex !== null && nextNeededStepIndex >= 0 && setCurrentStep(nextNeededStepIndex)}
+                  disabled={nextNeededStepIndex === null}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border ${
+                    nextNeededStepIndex === null
+                      ? 'text-muted-foreground border-border cursor-not-allowed'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
+                  }`}
+                >
+                  {nextNeededStepIndex === null ? 'All essentials complete' : 'Jump to next needed step'}
+                </button>
+                <button
+                  onClick={handleNewCase}
+                  className="px-3 py-2 rounded-lg text-sm font-medium border border-border text-muted-foreground hover:bg-background"
+                >
+                  Reset to blank
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {essentialChecks.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${
+                    item.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {item.ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  <span className="text-xs font-medium">{item.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground mt-3">
+              Essentials complete: {completedEssentials}/{essentialsTotal}
+            </div>
+          </div>
+        </div>
         {renderStep()}
       </main>
     </div>

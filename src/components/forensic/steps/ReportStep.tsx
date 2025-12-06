@@ -55,6 +55,10 @@ export const ReportStep: React.FC<ReportStepProps> = ({
     if (!dateStr) return '[Date]';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
+  const activeScenario = React.useMemo(
+    () => scenarioProjections.find((s) => s.id === selectedScenario),
+    [scenarioProjections, selectedScenario]
+  );
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -75,6 +79,13 @@ export const ReportStep: React.FC<ReportStepProps> = ({
             {isExportingWord ? 'Exporting...' : 'Export Word'}
           </button>
         </div>
+      </div>
+
+      <div className="print:hidden bg-muted border border-border rounded-lg p-4 mb-6">
+        <p className="text-sm font-bold text-foreground">Before you export</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          The report uses the active scenario (<span className="font-semibold text-foreground">{activeScenario?.label || 'Not set'}</span>) and only the scenarios you checked on the Summary page. When ready, choose Print, PDF, or Word above.
+        </p>
       </div>
 
       {/* Full Report */}
