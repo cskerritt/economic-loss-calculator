@@ -76,23 +76,23 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Work Life Factor</span>
-              <span className="font-mono font-bold">{algebraic.wlf.toFixed(4)}</span>
+              <span className="font-mono font-bold">{(algebraic.wlf ?? 0).toFixed(4)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Net Unemp Factor</span>
-              <span className="font-mono font-bold">{algebraic.unempFactor.toFixed(4)}</span>
+              <span className="font-mono font-bold">{(algebraic.unempFactor ?? 0).toFixed(4)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">After-Tax Factor</span>
-              <span className="font-mono font-bold">{algebraic.afterTaxFactor.toFixed(4)}</span>
+              <span className="font-mono font-bold">{(algebraic.afterTaxFactor ?? 0).toFixed(4)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Fringe Factor</span>
-              <span className="font-mono font-bold">{algebraic.fringeFactor.toFixed(4)}</span>
+              <span className="font-mono font-bold">{(algebraic.fringeFactor ?? 0).toFixed(4)}</span>
             </div>
             <div className="flex justify-between py-3 bg-primary/10 -mx-5 px-5 rounded-b-xl">
               <span className="font-bold text-primary">Full AEF Multiplier</span>
-              <span className="font-mono font-bold text-primary">{algebraic.fullMultiplier.toFixed(5)}</span>
+              <span className="font-mono font-bold text-primary">{(algebraic.fullMultiplier ?? 0).toFixed(5)}</span>
             </div>
           </div>
         </Card>
@@ -132,7 +132,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Work Life Factor</span>
-              <span className="font-bold text-primary">{workLifeFactor.toFixed(2)}%</span>
+              <span className="font-bold text-primary">{(workLifeFactor ?? 0).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Combined Tax Rate</span>
@@ -140,7 +140,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
             </div>
             <div className="flex justify-between py-2 border-b border-border">
               <span className="text-muted-foreground">Years to Separation</span>
-              <span className="font-bold">{algebraic.yfs.toFixed(2)} yrs</span>
+              <span className="font-bold">{(algebraic.yfs ?? 0).toFixed(2)} yrs</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-muted-foreground">Future Nominal Total</span>
@@ -197,9 +197,9 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                           <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
-                      <td className="p-3 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
-                      <td className="p-3 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
+                      <td className="p-3 text-right font-mono">{(scenario.retirementAge ?? 0).toFixed(1)}</td>
+                      <td className="p-3 text-right font-mono">{(scenario.yfs ?? 0).toFixed(2)}</td>
+                      <td className="p-3 text-right font-mono">{(scenario.wlfPercent ?? 0).toFixed(2)}%</td>
                       <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
                       <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
                       <td className="p-3 text-right font-mono font-bold">{fmtUSD(scenario.totalEarningsLoss)}</td>
