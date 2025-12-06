@@ -4,7 +4,7 @@ import {
   Menu, X
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
-import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, Table as DocxTable, TableRow, TableCell, WidthType } from 'docx';
 import { saveAs } from 'file-saver';
 
 import { WizardNavigation, WizardStep, StepCompletion } from './forensic/WizardNavigation';
@@ -410,12 +410,46 @@ export default function ForensicSuite() {
   const handleExportWord = useCallback(async () => {
     setIsExportingWord(true);
     try {
+      const includedScenarios = scenarioProjectionsWithIncluded.filter(s => s.included);
+      
+      const scenarioRows = includedScenarios.map(scenario => 
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: scenario.label + (scenario.id === earningsParams.selectedScenario ? ' (ACTIVE)' : ''), size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: scenario.retirementAge.toFixed(1), size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: scenario.yfs.toFixed(2), size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${scenario.wlfPercent.toFixed(2)}%`, size: 20 })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: fmtUSD(scenario.grandTotal), bold: true, size: 20 })] })] }),
+          ]
+        })
+      );
+
       const doc = new Document({
         sections: [{
           children: [
             new Paragraph({ children: [new TextRun({ text: 'APPRAISAL OF ECONOMIC LOSS', bold: true, size: 36 })], alignment: AlignmentType.CENTER }),
             new Paragraph({ children: [new TextRun({ text: `Regarding: ${caseInfo.plaintiff}`, size: 24 })], spacing: { after: 200 } }),
-            new Paragraph({ children: [new TextRun({ text: `Grand Total: ${fmtUSD(grandTotal)}`, bold: true, size: 28 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Grand Total: ${fmtUSD(grandTotal)}`, bold: true, size: 28 })], spacing: { after: 400 } }),
+            
+            // Retirement Scenario Analysis section
+            ...(includedScenarios.length > 0 ? [
+              new Paragraph({ children: [new TextRun({ text: 'RETIREMENT SCENARIO ANALYSIS', bold: true, size: 24 })], spacing: { before: 400, after: 200 } }),
+              new DocxTable({
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Scenario', bold: true, size: 20 })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Ret. Age', bold: true, size: 20 })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'YFS', bold: true, size: 20 })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'WLF', bold: true, size: 20 })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Grand Total', bold: true, size: 20 })] })] }),
+                    ]
+                  }),
+                  ...scenarioRows
+                ],
+                width: { size: 100, type: WidthType.PERCENTAGE }
+              })
+            ] : [])
           ]
         }]
       });
@@ -424,7 +458,7 @@ export default function ForensicSuite() {
     } finally {
       setIsExportingWord(false);
     }
-  }, [caseInfo.plaintiff, grandTotal, fmtUSD]);
+  }, [caseInfo.plaintiff, grandTotal, fmtUSD, scenarioProjectionsWithIncluded, earningsParams.selectedScenario]);
 
   const renderStep = () => {
     switch (WIZARD_STEPS[currentStep].id) {
