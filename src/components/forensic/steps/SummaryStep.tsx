@@ -3,7 +3,7 @@ import { Table, Copy, Check, Target, BarChart3 } from 'lucide-react';
 import { Card } from '../ui';
 import { Projection, HhServices, HhsData, LcpData, Algebraic, ScenarioProjection } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
-import { Checkbox } from '../../../components/ui/checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface SummaryStepProps {
   projection: Projection;

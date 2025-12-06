@@ -56,7 +56,7 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
         </Card>
 
         {/* Key Dates */}
-        <Card className="p-5 border-l-4 border-l-amber">
+        <Card className="p-5 border-l-4 border-l-amber-500">
           <SectionHeader icon={CalendarIcon} title="Key Dates" subtitle="Injury & Valuation Timeline" />
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
