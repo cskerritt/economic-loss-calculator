@@ -236,9 +236,9 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
                           <span className="ml-1 text-[9px] bg-primary text-primary-foreground px-1 rounded">ACTIVE</span>
                         )}
                       </td>
-                      <td className="p-2 text-right font-mono">{s.retirementAge.toFixed(1)}</td>
-                      <td className="p-2 text-right font-mono">{s.yfs.toFixed(2)}</td>
-                      <td className="p-2 text-right font-mono font-bold text-primary">{s.wlf.toFixed(2)}%</td>
+                      <td className="p-2 text-right font-mono">{(s.retirementAge ?? 0).toFixed(1)}</td>
+                      <td className="p-2 text-right font-mono">{(s.yfs ?? 0).toFixed(2)}</td>
+                      <td className="p-2 text-right font-mono font-bold text-primary">{(s.wlf ?? 0).toFixed(2)}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -247,19 +247,19 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
 
             {/* Selected Scenario Summary */}
             <div className="bg-amber/10 p-3 rounded-lg mt-3">
-              <h4 className="text-[10px] font-bold uppercase text-amber-600 mb-2">Selected: {selectedScenarioData?.label}</h4>
+              <h4 className="text-[10px] font-bold uppercase text-amber-600 mb-2">Selected: {selectedScenarioData?.label ?? 'N/A'}</h4>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
                   <span className="block text-[10px] text-muted-foreground">YFS</span>
-                  <span className="font-bold text-lg">{selectedScenarioData?.yfs.toFixed(2)}</span>
+                  <span className="font-bold text-lg">{(selectedScenarioData?.yfs ?? 0).toFixed(2)}</span>
                 </div>
                 <div>
                   <span className="block text-[10px] text-muted-foreground">WLF</span>
-                  <span className="font-bold text-lg text-primary">{selectedScenarioData?.wlf.toFixed(2)}%</span>
+                  <span className="font-bold text-lg text-primary">{(selectedScenarioData?.wlf ?? 0).toFixed(2)}%</span>
                 </div>
                 <div>
                   <span className="block text-[10px] text-muted-foreground">Ret Age</span>
-                  <span className="font-bold text-lg">{selectedScenarioData?.retirementAge.toFixed(1)}</span>
+                  <span className="font-bold text-lg">{(selectedScenarioData?.retirementAge ?? 0).toFixed(1)}</span>
                 </div>
               </div>
             </div>
