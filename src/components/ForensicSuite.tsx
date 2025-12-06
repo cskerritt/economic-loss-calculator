@@ -1,541 +1,76 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
-  TrendingUp, 
-  FileText, 
-  Plus,
-  Trash2,
-  Copy,
-  Check,
-  Sigma,
-  Table,
-  Menu,
-  X,
-  History,
-  Calendar as CalendarIcon,
-  User,
-  Home,
-  BookOpen,
-  Scale,
-  Briefcase,
-  HeartPulse,
-  Download,
-  FileDown,
-  Loader2
+  Sigma, User, Briefcase, BookOpen, Home, HeartPulse, FileText, BarChart3,
+  Download, FileDown, Loader2, Menu, X
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table as DocxTable, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 
-// --- CONSTANTS ---
-const CPI_CATEGORIES = [
-  { id: 'evals', label: 'Physician Evals & Home Care', rate: 2.88 },
-  { id: 'rx', label: 'Rx / Medical Commodities', rate: 1.65 },
-  { id: 'surgery', label: 'Hospital/Surgical Services', rate: 4.07 },
-  { id: 'therapy', label: 'Therapy & Treatments', rate: 1.62 },
-  { id: 'transport', label: 'Transportation', rate: 4.32 },
-  { id: 'home', label: 'Home Modifications', rate: 4.16 },
-  { id: 'educ', label: 'Education/Training', rate: 2.61 },
-  { id: 'custom', label: 'Custom Rate', rate: 0.00 }
+import { WizardNavigation, WizardStep } from './forensic/WizardNavigation';
+import { 
+  CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData,
+  DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES, CPI_CATEGORIES
+} from './forensic/types';
+import { CaseInfoStep, EarningsStep, NarrativesStep, HouseholdStep, LCPStep, SummaryStep } from './forensic/steps';
+
+// Wizard Steps Configuration
+const WIZARD_STEPS: WizardStep[] = [
+  { id: 'case', label: 'Case Info', icon: User },
+  { id: 'earnings', label: 'Earnings', icon: Briefcase },
+  { id: 'narratives', label: 'Narratives', icon: BookOpen },
+  { id: 'household', label: 'Household', icon: Home },
+  { id: 'lcp', label: 'Life Care', icon: HeartPulse },
+  { id: 'summary', label: 'Summary', icon: BarChart3 },
+  { id: 'report', label: 'Report', icon: FileText },
 ];
 
-// --- TYPES ---
-interface CaseInfo {
-  // Basic Info
-  plaintiff: string;
-  fileNumber: string;
-  attorney: string;
-  lawFirm: string;
-  reportDate: string;
-  
-  // Demographics
-  gender: string;
-  dob: string;
-  education: string;
-  maritalStatus: string;
-  dependents: string;
-  city: string;
-  county: string;
-  state: string;
-  
-  // Dates
-  dateOfInjury: string;
-  dateOfTrial: string;
-  retirementAge: number;
-  
-  // Actuarial
-  lifeExpectancy: number;
-  wleSource: string;
-  lifeTableSource: string;
-  
-  // Legal
-  jurisdiction: string;
-  caseType: string;
-  
-  // Narratives
-  medicalSummary: string;
-  employmentHistory: string;
-  earningsHistory: string;
-  preInjuryCapacity: string;
-  postInjuryCapacity: string;
-  functionalLimitations: string;
-}
-
-interface EarningsParams {
-  baseEarnings: number;
-  residualEarnings: number;
-  wle: number;
-  wageGrowth: number;
-  discountRate: number;
-  fringeRate: number;
-  // Union Specifics
-  pension: number;
-  healthWelfare: number;
-  annuity: number;
-  clothingAllowance: number;
-  otherBenefits: number;
-  // Risk & Tax
-  unemploymentRate: number;
-  uiReplacementRate: number;
-  fedTaxRate: number;
-  stateTaxRate: number;
-}
-
-interface HhServices {
-  active: boolean;
-  hoursPerWeek: number;
-  hourlyRate: number;
-  growthRate: number;
-  discountRate: number;
-}
-
-interface LcpItem {
-  id: number;
-  categoryId: string;
-  name: string;
-  baseCost: number;
-  freqType: string;
-  duration: number;
-  startYear: number;
-  cpi: number;
-  recurrenceInterval: number;
-}
-
-interface InputGroupProps {
-  label: string;
-  value: string | number;
-  onChange: (value: string) => void;
-  type?: string;
-  prefix?: string | null;
-  suffix?: string | null;
-  disabled?: boolean;
-  placeholder?: string;
-  step?: string;
-  className?: string;
-}
-
-interface TextAreaProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  rows?: number;
-}
-
-// --- UI COMPONENTS ---
-const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-card rounded-xl shadow-sm border border-border overflow-hidden ${className}`}>
-    {children}
-  </div>
-);
-
-const SectionHeader = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) => (
-  <div className="flex items-center gap-3 mb-5 pb-3 border-b border-border/50">
-    <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/20">
-      <Icon className="w-5 h-5" />
-    </div>
-    <div>
-      <h3 className="font-bold text-foreground text-lg leading-tight">{title}</h3>
-      {subtitle && <p className="text-xs text-muted-foreground mt-0.5 font-medium">{subtitle}</p>}
-    </div>
-  </div>
-);
-
-const InputGroup = ({ 
-  label, 
-  value, 
-  onChange, 
-  type = "number", 
-  prefix = null, 
-  suffix = null, 
-  disabled = false, 
-  placeholder = "", 
-  step = "any", 
-  className = "" 
-}: InputGroupProps) => (
-  <div className={`mb-3 ${className}`}>
-    <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</label>
-    <div className={`relative rounded-lg shadow-sm ${disabled ? 'opacity-60' : ''}`}>
-      {prefix && (
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <span className="text-muted-foreground sm:text-sm font-medium">{prefix}</span>
-        </div>
-      )}
-      <input
-        type={type}
-        step={step}
-        value={value}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className={`block w-full rounded-lg border-border py-2 focus:ring-primary focus:border-primary text-sm border px-3 transition-all bg-background text-foreground ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''}`}
-      />
-      {suffix && (
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-          <span className="text-muted-foreground sm:text-sm font-medium">{suffix}</span>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-const TextArea = ({ label, value, onChange, placeholder = "", rows = 3 }: TextAreaProps) => (
-  <div className="mb-3">
-    <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</label>
-    <textarea
-      rows={rows}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="block w-full rounded-lg border-border py-2 focus:ring-primary focus:border-primary text-sm border px-3 transition-all resize-none bg-background text-foreground"
-    />
-  </div>
-);
-
-// --- EXPORT BUTTONS COMPONENT ---
-interface ExportButtonsProps {
-  reportRef: React.RefObject<HTMLDivElement>;
-  caseInfo: CaseInfo;
-  dateCalc: { ageInjury: string; ageTrial: string; currentAge: string; pastYears: number; derivedYFS: number };
-  earningsParams: EarningsParams;
-  algebraic: { wlf: number; unempFactor: number; afterTaxFactor: number; fringeFactor: number; fullMultiplier: number; realizedMultiplier: number; yfs: number; flatFringeAmount: number; combinedTaxRate: number };
-  projection: { pastSchedule: Array<{ year: number; label: string; grossBase: number; grossActual: number; netLoss: number; isManual: boolean; fraction: number }>; futureSchedule: Array<{ year: number; gross: number; netLoss: number; pv: number }>; totalPastLoss: number; totalFutureNominal: number; totalFuturePV: number };
-  hhServices: HhServices;
-  hhsData: { totalNom: number; totalPV: number };
-  lcpItems: LcpItem[];
-  lcpData: { items: Array<LcpItem & { totalNom: number; totalPV: number }>; totalNom: number; totalPV: number };
-  isUnionMode: boolean;
-  grandTotal: number;
-  workLifeFactor: number;
-  fmtUSD: (n: number) => string;
-  fmtPct: (n: number) => string;
-}
-
-const ExportButtons = ({ 
-  reportRef, 
-  caseInfo, 
-  dateCalc, 
-  earningsParams, 
-  algebraic, 
-  projection, 
-  hhServices, 
-  hhsData, 
-  lcpItems, 
-  lcpData, 
-  isUnionMode, 
-  grandTotal, 
-  workLifeFactor,
-  fmtUSD, 
-  fmtPct 
-}: ExportButtonsProps) => {
+export default function ForensicSuite() {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isUnionMode, setIsUnionMode] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingWord, setIsExportingWord] = useState(false);
 
-  const handleExportPdf = useCallback(async () => {
-    if (!reportRef.current) return;
-    setIsExportingPdf(true);
-    
-    try {
-      const element = reportRef.current;
-      const filename = `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}_${caseInfo.reportDate || new Date().toISOString().split('T')[0]}.pdf`;
-      
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      };
-
-      await html2pdf().set(opt).from(element).save();
-    } catch (error) {
-      console.error('PDF export error:', error);
-    } finally {
-      setIsExportingPdf(false);
-    }
-  }, [reportRef, caseInfo]);
-
-  const handleExportWord = useCallback(async () => {
-    setIsExportingWord(true);
-    
-    try {
-      const formatDate = (dateStr: string) => {
-        if (!dateStr) return '[Date]';
-        return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      };
-
-      const createTableRow = (cells: string[], isHeader = false) => {
-        return new TableRow({
-          children: cells.map((cell, idx) => new TableCell({
-            children: [new Paragraph({ 
-              children: [new TextRun({ text: cell, bold: isHeader, size: 20 })],
-              alignment: idx === 0 ? AlignmentType.LEFT : AlignmentType.RIGHT
-            })],
-            width: { size: 100 / cells.length, type: WidthType.PERCENTAGE },
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
-              bottom: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
-              left: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
-              right: { style: BorderStyle.SINGLE, size: 1, color: '999999' },
-            }
-          }))
-        });
-      };
-
-      const sections = [];
-
-      // Title
-      sections.push(
-        new Paragraph({ children: [new TextRun({ text: 'APPRAISAL OF ECONOMIC LOSS', bold: true, size: 36 })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
-        new Paragraph({ children: [new TextRun({ text: 'PREPARED BY: Kincaid Wolstein Vocational and Rehabilitation Services', size: 22 })], alignment: AlignmentType.CENTER }),
-        new Paragraph({ children: [new TextRun({ text: 'One University Plaza ~ Suite 302, Hackensack, New Jersey 07601', size: 22 })], alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
-        new Paragraph({ children: [new TextRun({ text: `PREPARED FOR: ${caseInfo.attorney || '[Attorney]'} - ${caseInfo.lawFirm || '[Law Firm]'}`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `REGARDING: ${caseInfo.plaintiff || '[Plaintiff]'}`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `DATE OF BIRTH: ${formatDate(caseInfo.dob)}`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `REPORT DATE: ${formatDate(caseInfo.reportDate)}`, size: 22 })], spacing: { after: 400 } })
-      );
-
-      // Certification
-      sections.push(
-        new Paragraph({ text: 'CERTIFICATION', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-        new Paragraph({ 
-          children: [new TextRun({ text: 'This is to certify that we are not related to any of the parties to the subject action, nor do we have any present or intended financial interest in this case beyond the fees due for professional services rendered in connection with this report and possible subsequent services. All assumptions, methodologies, and calculations utilized in this appraisal report are based on current knowledge and methods applied to the determination of projected pecuniary losses, consistent with accepted practices in forensic economics.', size: 22 })],
-          spacing: { after: 300 }
-        })
-      );
-
-      // Opinion of Economic Losses
-      sections.push(
-        new Paragraph({ text: 'OPINION OF ECONOMIC LOSSES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-        new Paragraph({ 
-          children: [new TextRun({ text: `Within a reasonable degree of economic certainty, ${caseInfo.plaintiff || '[Plaintiff]'} has sustained compensable economic losses as summarized below.`, size: 22 })],
-          spacing: { after: 200 }
-        })
-      );
-
-      // Summary Table
-      const summaryRows = [
-        createTableRow(['Category', 'Past Value', 'Future (PV)', 'Total'], true),
-        createTableRow(['Lost Earning Capacity', fmtUSD(projection.totalPastLoss), fmtUSD(projection.totalFuturePV), fmtUSD(projection.totalPastLoss + projection.totalFuturePV)])
-      ];
-      if (hhServices.active) {
-        summaryRows.push(createTableRow(['Household Services', '—', fmtUSD(hhsData.totalPV), fmtUSD(hhsData.totalPV)]));
-      }
-      if (lcpItems.length > 0) {
-        summaryRows.push(createTableRow(['Life Care Plan', '—', fmtUSD(lcpData.totalPV), fmtUSD(lcpData.totalPV)]));
-      }
-      summaryRows.push(createTableRow(['GRAND TOTAL', fmtUSD(projection.totalPastLoss), fmtUSD(projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV), fmtUSD(grandTotal)], true));
-
-      sections.push(new DocxTable({ rows: summaryRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
-
-      // Background Facts
-      sections.push(
-        new Paragraph({ text: 'BACKGROUND FACTS AND ASSUMPTIONS', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-        new Paragraph({ children: [new TextRun({ text: `Plaintiff: ${caseInfo.plaintiff} (${caseInfo.gender})`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Date of Birth: ${formatDate(caseInfo.dob)}`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Date of Injury: ${formatDate(caseInfo.dateOfInjury)}`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Residence: ${[caseInfo.city, caseInfo.county, caseInfo.state].filter(Boolean).join(', ')}`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Education: ${caseInfo.education}`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Current Age: ${dateCalc.currentAge} years`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Age at Injury: ${dateCalc.ageInjury} years`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Life Expectancy: ${caseInfo.lifeExpectancy} years`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Work Life Expectancy: ${earningsParams.wle} years`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Years to Separation: ${dateCalc.derivedYFS.toFixed(2)} years`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Work Life Factor: ${workLifeFactor.toFixed(2)}%`, size: 22 })], spacing: { after: 200 } })
-      );
-
-      // Narratives
-      if (caseInfo.medicalSummary) {
-        sections.push(
-          new Paragraph({ text: 'Medical Summary', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }),
-          new Paragraph({ children: [new TextRun({ text: caseInfo.medicalSummary, size: 22 })], spacing: { after: 200 } })
-        );
-      }
-      if (caseInfo.employmentHistory) {
-        sections.push(
-          new Paragraph({ text: 'Employment History', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }),
-          new Paragraph({ children: [new TextRun({ text: caseInfo.employmentHistory, size: 22 })], spacing: { after: 200 } })
-        );
-      }
-
-      // AEF Table
-      sections.push(
-        new Paragraph({ text: 'ADJUSTED EARNINGS FACTOR (AEF)', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-        new DocxTable({
-          rows: [
-            createTableRow(['Component', 'Value', 'Cumulative'], true),
-            createTableRow(['Work Life Factor (WLF)', algebraic.wlf.toFixed(4), algebraic.wlf.toFixed(4)]),
-            createTableRow(['Net Unemployment Factor', algebraic.unempFactor.toFixed(4), (algebraic.wlf * algebraic.unempFactor).toFixed(4)]),
-            createTableRow(['After-Tax Factor', algebraic.afterTaxFactor.toFixed(4), (algebraic.wlf * algebraic.unempFactor * algebraic.afterTaxFactor).toFixed(4)]),
-            createTableRow(['Fringe Benefit Factor', algebraic.fringeFactor.toFixed(4), algebraic.fullMultiplier.toFixed(5)])
-          ],
-          width: { size: 100, type: WidthType.PERCENTAGE }
-        })
-      );
-
-      // Economic Variables
-      sections.push(
-        new Paragraph({ text: 'ECONOMIC VARIABLES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-        new Paragraph({ children: [new TextRun({ text: `Wage Growth Rate: ${earningsParams.wageGrowth}%`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Discount Rate: ${earningsParams.discountRate}%`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Unemployment Rate: ${earningsParams.unemploymentRate}%`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `UI Replacement Rate: ${earningsParams.uiReplacementRate}%`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Federal Tax Rate: ${earningsParams.fedTaxRate}%`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `State Tax Rate: ${earningsParams.stateTaxRate}%`, size: 22 })], spacing: { after: 100 } }),
-        new Paragraph({ children: [new TextRun({ text: `Combined Tax Rate: ${fmtPct(algebraic.combinedTaxRate)}`, size: 22 })], spacing: { after: 200 } })
-      );
-
-      const doc = new Document({
-        sections: [{ children: sections }]
-      });
-
-      const blob = await Packer.toBlob(doc);
-      const filename = `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}_${caseInfo.reportDate || new Date().toISOString().split('T')[0]}.docx`;
-      saveAs(blob, filename);
-    } catch (error) {
-      console.error('Word export error:', error);
-    } finally {
-      setIsExportingWord(false);
-    }
-  }, [caseInfo, dateCalc, earningsParams, algebraic, projection, hhServices, hhsData, lcpItems, lcpData, grandTotal, workLifeFactor, fmtUSD, fmtPct]);
-
-  return (
-    <div className="text-center print:hidden mt-12 flex flex-col sm:flex-row gap-3 justify-center">
-      <button 
-        onClick={() => window.print()} 
-        className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2 mx-auto sm:mx-0 transition-all active:scale-95"
-      >
-        <FileText className="w-5 h-5" /> Print
-      </button>
-      <button 
-        onClick={handleExportPdf}
-        disabled={isExportingPdf}
-        className="bg-rose-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center gap-2 mx-auto sm:mx-0 transition-all active:scale-95 disabled:opacity-50"
-      >
-        {isExportingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
-        {isExportingPdf ? 'Exporting...' : 'Export PDF'}
-      </button>
-      <button 
-        onClick={handleExportWord}
-        disabled={isExportingWord}
-        className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center gap-2 mx-auto sm:mx-0 transition-all active:scale-95 disabled:opacity-50"
-      >
-        {isExportingWord ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-        {isExportingWord ? 'Exporting...' : 'Export Word'}
-      </button>
-    </div>
-  );
-};
-
-// --- MAIN APPLICATION ---
-export default function ForensicSuite() {
-  const [activeTab, setActiveTab] = useState('analysis');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [strictAlgebraicMode] = useState(true);
-  const [isUnionMode, setIsUnionMode] = useState(false);
-  const [copySuccess, setCopySuccess] = useState('');
-  const reportRef = useRef<HTMLDivElement>(null);
-
-  // --- PERSISTENT STATE ---
+  // Persistent State
   const [caseInfo, setCaseInfo] = useState<CaseInfo>(() => {
-    const saved = localStorage.getItem('fs_case_v9');
-    return saved ? JSON.parse(saved) : {
-      plaintiff: '',
-      fileNumber: '',
-      attorney: '',
-      lawFirm: '',
-      reportDate: new Date().toISOString().split('T')[0],
-      gender: '',
-      dob: '',
-      education: '',
-      maritalStatus: '',
-      dependents: '',
-      city: '',
-      county: '',
-      state: 'New Jersey',
-      dateOfInjury: '',
-      dateOfTrial: '',
-      retirementAge: 67,
-      lifeExpectancy: 0,
-      wleSource: 'Skoog-Ciecka Work Life Expectancy Tables (2017)',
-      lifeTableSource: 'CDC National Vital Statistics Reports (2021)',
-      jurisdiction: 'New Jersey',
-      caseType: 'Personal Injury',
-      medicalSummary: '',
-      employmentHistory: '',
-      earningsHistory: '',
-      preInjuryCapacity: '',
-      postInjuryCapacity: '',
-      functionalLimitations: ''
-    };
+    const saved = localStorage.getItem('fs_case_v10');
+    return saved ? JSON.parse(saved) : DEFAULT_CASE_INFO;
   });
 
   const [earningsParams, setEarningsParams] = useState<EarningsParams>(() => {
-    const saved = localStorage.getItem('fs_params_v9');
-    return saved ? JSON.parse(saved) : {
-      baseEarnings: 0,
-      residualEarnings: 0,
-      wle: 0,
-      wageGrowth: 3.50,
-      discountRate: 4.25,
-      fringeRate: 21.5, 
-      pension: 0,
-      healthWelfare: 0,
-      annuity: 0,
-      clothingAllowance: 0,
-      otherBenefits: 0,
-      unemploymentRate: 4.2,
-      uiReplacementRate: 40.0,
-      fedTaxRate: 15.0,
-      stateTaxRate: 4.5,
-    };
+    const saved = localStorage.getItem('fs_params_v10');
+    return saved ? JSON.parse(saved) : DEFAULT_EARNINGS_PARAMS;
   });
 
   const [hhServices, setHhServices] = useState<HhServices>(() => {
-    const saved = localStorage.getItem('fs_hhs_v9');
-    return saved ? JSON.parse(saved) : {
-      active: false,
-      hoursPerWeek: 0,
-      hourlyRate: 25.00,
-      growthRate: 3.0,
-      discountRate: 4.25
-    };
+    const saved = localStorage.getItem('fs_hhs_v10');
+    return saved ? JSON.parse(saved) : DEFAULT_HH_SERVICES;
   });
 
   const [pastActuals, setPastActuals] = useState<Record<number, string>>(() => {
-    const saved = localStorage.getItem('fs_past_actuals_v9');
+    const saved = localStorage.getItem('fs_past_actuals_v10');
     return saved ? JSON.parse(saved) : {};
   });
 
   const [lcpItems, setLcpItems] = useState<LcpItem[]>(() => {
-    const saved = localStorage.getItem('fs_lcp_v9');
+    const saved = localStorage.getItem('fs_lcp_v10');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // --- AUTO-CALC ENGINE ---
-  const dateCalc = useMemo(() => {
+  // Auto-Save
+  useEffect(() => { localStorage.setItem('fs_case_v10', JSON.stringify(caseInfo)); }, [caseInfo]);
+  useEffect(() => { localStorage.setItem('fs_params_v10', JSON.stringify(earningsParams)); }, [earningsParams]);
+  useEffect(() => { localStorage.setItem('fs_lcp_v10', JSON.stringify(lcpItems)); }, [lcpItems]);
+  useEffect(() => { localStorage.setItem('fs_past_actuals_v10', JSON.stringify(pastActuals)); }, [pastActuals]);
+  useEffect(() => { localStorage.setItem('fs_hhs_v10', JSON.stringify(hhServices)); }, [hhServices]);
+
+  // Date Calculations
+  const dateCalc: DateCalc = useMemo(() => {
     const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
-    if (!caseInfo.dob || !caseInfo.dateOfInjury || !caseInfo.dateOfTrial) return { ageInjury: '0', ageTrial: '0', currentAge: '0', pastYears: 0, derivedYFS: 0 };
+    if (!caseInfo.dob || !caseInfo.dateOfInjury || !caseInfo.dateOfTrial) 
+      return { ageInjury: '0', ageTrial: '0', currentAge: '0', pastYears: 0, derivedYFS: 0 };
 
     const dob = new Date(caseInfo.dob);
     const doi = new Date(caseInfo.dateOfInjury);
@@ -549,30 +84,16 @@ export default function ForensicSuite() {
     targetRetirementDate.setFullYear(dob.getFullYear() + caseInfo.retirementAge);
     const derivedYFS = Math.max(0, (targetRetirementDate.getTime() - dot.getTime()) / msPerYear);
 
-    return { 
-      ageInjury: getAge(doi).toFixed(1), 
-      ageTrial: getAge(dot).toFixed(1),
-      currentAge: getAge(now).toFixed(1),
-      pastYears,
-      derivedYFS
-    };
+    return { ageInjury: getAge(doi).toFixed(1), ageTrial: getAge(dot).toFixed(1), currentAge: getAge(now).toFixed(1), pastYears, derivedYFS };
   }, [caseInfo]);
 
-  // Work Life Factor
   const workLifeFactor = useMemo(() => {
     if (dateCalc.derivedYFS <= 0) return 0;
     return (earningsParams.wle / dateCalc.derivedYFS) * 100;
   }, [earningsParams.wle, dateCalc.derivedYFS]);
 
-  // Auto-Save
-  useEffect(() => { localStorage.setItem('fs_case_v9', JSON.stringify(caseInfo)); }, [caseInfo]);
-  useEffect(() => { localStorage.setItem('fs_params_v9', JSON.stringify(earningsParams)); }, [earningsParams]);
-  useEffect(() => { localStorage.setItem('fs_lcp_v9', JSON.stringify(lcpItems)); }, [lcpItems]);
-  useEffect(() => { localStorage.setItem('fs_past_actuals_v9', JSON.stringify(pastActuals)); }, [pastActuals]);
-  useEffect(() => { localStorage.setItem('fs_hhs_v9', JSON.stringify(hhServices)); }, [hhServices]);
-
-  // --- PROJECTION ENGINE ---
-  const algebraic = useMemo(() => {
+  // Algebraic Calculations
+  const algebraic: Algebraic = useMemo(() => {
     const yfs = dateCalc.derivedYFS;
     const wlf = yfs > 0 ? (earningsParams.wle / yfs) : 0;
     const unempFactor = 1 - ((earningsParams.unemploymentRate / 100) * (1 - (earningsParams.uiReplacementRate / 100)));
@@ -589,27 +110,17 @@ export default function ForensicSuite() {
       fringeFactor = 1 + (earningsParams.fringeRate / 100);
     }
 
-    let fullMultiplier = 0;
-    let realizedMultiplier = 0;
-
-    if (strictAlgebraicMode) {
-      fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
-      realizedMultiplier = afterTaxFactor * fringeFactor;
-    } else {
-      const effFringe = isUnionMode ? (flatFringeAmount/earningsParams.baseEarnings) : (earningsParams.fringeRate/100);
-      fullMultiplier = wlf * unempFactor * (afterTaxFactor + effFringe);
-      realizedMultiplier = (afterTaxFactor + effFringe);
-    }
-
-    // Combined Tax Rate
+    const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
+    const realizedMultiplier = afterTaxFactor * fringeFactor;
     const combinedTaxRate = 1 - afterTaxFactor;
 
     return { wlf, unempFactor, afterTaxFactor, fringeFactor, fullMultiplier, realizedMultiplier, yfs, flatFringeAmount, combinedTaxRate };
-  }, [dateCalc, earningsParams, strictAlgebraicMode, isUnionMode]);
+  }, [dateCalc, earningsParams, isUnionMode]);
 
-  const projection = useMemo(() => {
-    const pastSchedule: Array<{ year: number; label: string; grossBase: number; grossActual: number; netLoss: number; isManual: boolean; fraction: number }> = [];
-    const futureSchedule: Array<{ year: number; gross: number; netLoss: number; pv: number }> = [];
+  // Projection Engine
+  const projection: Projection = useMemo(() => {
+    const pastSchedule: Projection['pastSchedule'] = [];
+    const futureSchedule: Projection['futureSchedule'] = [];
     let totalPastLoss = 0, totalFutureNominal = 0, totalFuturePV = 0;
 
     if (!caseInfo.dateOfInjury) return { pastSchedule, futureSchedule, totalPastLoss, totalFutureNominal, totalFuturePV };
@@ -618,20 +129,16 @@ export default function ForensicSuite() {
     const fullPast = Math.floor(dateCalc.pastYears);
     const partialPast = dateCalc.pastYears % 1;
     
-    // PAST
     for (let i = 0; i <= fullPast; i++) {
       const fraction = (i === fullPast && partialPast > 0) ? partialPast : (i === fullPast && partialPast === 0 ? 0 : 1);
       if (fraction <= 0) continue;
 
       const currentYear = startYear + i;
       const growth = Math.pow(1 + (earningsParams.wageGrowth/100), i);
-      
       const grossBase = earningsParams.baseEarnings * growth * fraction;
       const netButFor = grossBase * algebraic.fullMultiplier;
 
-      let netActual = 0;
-      let grossActual = 0;
-      let isManual = false;
+      let netActual = 0, grossActual = 0, isManual = false;
 
       if (pastActuals[currentYear] !== undefined && pastActuals[currentYear] !== "") {
         grossActual = parseFloat(pastActuals[currentYear]);
@@ -647,18 +154,14 @@ export default function ForensicSuite() {
       pastSchedule.push({ year: currentYear, label: `Past-${i+1}`, grossBase, grossActual, netLoss, isManual, fraction });
     }
 
-    // FUTURE
     const futureYears = Math.ceil(algebraic.yfs);
     for (let i = 0; i < futureYears; i++) {
       const growth = Math.pow(1 + (earningsParams.wageGrowth/100), i);
       const discount = 1 / Math.pow(1 + (earningsParams.discountRate/100), i + 0.5);
-      
       const grossBase = earningsParams.baseEarnings * growth;
       const netButFor = grossBase * algebraic.fullMultiplier;
-      
       const grossRes = earningsParams.residualEarnings * growth;
       const netActual = grossRes * algebraic.fullMultiplier;
-
       const netLoss = netButFor - netActual;
       const pv = netLoss * discount;
       
@@ -669,26 +172,22 @@ export default function ForensicSuite() {
     return { pastSchedule, futureSchedule, totalPastLoss, totalFutureNominal, totalFuturePV };
   }, [earningsParams, algebraic, pastActuals, caseInfo.dateOfInjury, dateCalc]);
 
-  // --- HOUSEHOLD SERVICES ENGINE ---
-  const hhsData = useMemo(() => {
+  // Household Services
+  const hhsData: HhsData = useMemo(() => {
     if (!hhServices.active) return { totalNom: 0, totalPV: 0 };
-    
     let totalNom = 0, totalPV = 0;
     const years = Math.ceil(dateCalc.derivedYFS);
-    
     for(let i=0; i<years; i++) {
       const annualValue = hhServices.hoursPerWeek * 52 * hhServices.hourlyRate * Math.pow(1 + hhServices.growthRate/100, i);
       const disc = 1 / Math.pow(1 + hhServices.discountRate/100, i + 0.5);
-      const pv = annualValue * disc;
-      
       totalNom += annualValue;
-      totalPV += pv;
+      totalPV += annualValue * disc;
     }
     return { totalNom, totalPV };
   }, [hhServices, dateCalc.derivedYFS]);
 
-  // --- LCP ENGINE ---
-  const lcpData = useMemo(() => {
+  // LCP Engine
+  const lcpData: LcpData = useMemo(() => {
     let totalNom = 0, totalPV = 0;
     const processed = lcpItems.map(item => {
       let iNom = 0, iPV = 0;
@@ -714,20 +213,109 @@ export default function ForensicSuite() {
 
   const fmtUSD = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
   const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
-
-  const copyTable = () => {
-    const txt = projection.futureSchedule.map(r => `${r.year}\t${r.gross.toFixed(2)}\t${r.netLoss.toFixed(2)}\t${r.pv.toFixed(2)}`).join('\n');
-    navigator.clipboard.writeText(`Year\tGross\tNetLoss\tPV\n${txt}`);
-    setCopySuccess('Copied!');
-    setTimeout(() => setCopySuccess(''), 2000);
-  };
-
   const grandTotal = projection.totalPastLoss + projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV;
+
+  const handleExportPdf = useCallback(async () => {
+    if (!reportRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+      await html2pdf().set(opt).from(reportRef.current).save();
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }, [caseInfo.plaintiff]);
+
+  const handleExportWord = useCallback(async () => {
+    setIsExportingWord(true);
+    try {
+      const doc = new Document({
+        sections: [{
+          children: [
+            new Paragraph({ children: [new TextRun({ text: 'APPRAISAL OF ECONOMIC LOSS', bold: true, size: 36 })], alignment: AlignmentType.CENTER }),
+            new Paragraph({ children: [new TextRun({ text: `Regarding: ${caseInfo.plaintiff}`, size: 24 })], spacing: { after: 200 } }),
+            new Paragraph({ children: [new TextRun({ text: `Grand Total: ${fmtUSD(grandTotal)}`, bold: true, size: 28 })] }),
+          ]
+        }]
+      });
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}.docx`);
+    } finally {
+      setIsExportingWord(false);
+    }
+  }, [caseInfo.plaintiff, grandTotal, fmtUSD]);
+
+  const renderStep = () => {
+    switch (WIZARD_STEPS[currentStep].id) {
+      case 'case':
+        return <CaseInfoStep caseInfo={caseInfo} setCaseInfo={setCaseInfo} dateCalc={dateCalc} />;
+      case 'earnings':
+        return <EarningsStep earningsParams={earningsParams} setEarningsParams={setEarningsParams} dateCalc={dateCalc} algebraic={algebraic} workLifeFactor={workLifeFactor} isUnionMode={isUnionMode} setIsUnionMode={setIsUnionMode} pastActuals={pastActuals} setPastActuals={setPastActuals} dateOfInjury={caseInfo.dateOfInjury} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
+      case 'narratives':
+        return <NarrativesStep caseInfo={caseInfo} setCaseInfo={setCaseInfo} />;
+      case 'household':
+        return <HouseholdStep hhServices={hhServices} setHhServices={setHhServices} hhsData={hhsData} fmtUSD={fmtUSD} />;
+      case 'lcp':
+        return <LCPStep lcpItems={lcpItems} setLcpItems={setLcpItems} lcpData={lcpData} lifeExpectancy={caseInfo.lifeExpectancy} fmtUSD={fmtUSD} />;
+      case 'summary':
+        return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
+      case 'report':
+        return (
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8 print:hidden">
+              <h2 className="text-2xl font-bold text-foreground">Generate Report</h2>
+              <p className="text-muted-foreground mt-1">Export your economic appraisal report</p>
+              <div className="flex gap-3 justify-center mt-6">
+                <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2">
+                  <FileText className="w-5 h-5" /> Print
+                </button>
+                <button onClick={handleExportPdf} disabled={isExportingPdf} className="bg-rose-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center gap-2 disabled:opacity-50">
+                  {isExportingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
+                  {isExportingPdf ? 'Exporting...' : 'Export PDF'}
+                </button>
+                <button onClick={handleExportWord} disabled={isExportingWord} className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50">
+                  {isExportingWord ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                  {isExportingWord ? 'Exporting...' : 'Export Word'}
+                </button>
+              </div>
+            </div>
+            <div ref={reportRef} className="bg-white text-slate-900 p-8 shadow-lg rounded-lg print:shadow-none print:rounded-none">
+              <header className="text-center mb-8 border-b-2 border-slate-900 pb-6">
+                <h1 className="text-2xl font-bold uppercase tracking-wide">Appraisal of Economic Loss</h1>
+                <p className="text-sm mt-2">Prepared for: {caseInfo.attorney} — {caseInfo.lawFirm}</p>
+                <p className="text-sm">Regarding: {caseInfo.plaintiff}</p>
+                <p className="text-sm">Report Date: {caseInfo.reportDate ? new Date(caseInfo.reportDate).toLocaleDateString() : 'N/A'}</p>
+              </header>
+              <section className="mb-6">
+                <h2 className="text-lg font-bold border-b border-slate-300 pb-2 mb-4">Opinion of Economic Losses</h2>
+                <table className="w-full text-sm border-collapse">
+                  <thead><tr className="bg-slate-100"><th className="p-2 text-left border">Category</th><th className="p-2 text-right border">Past</th><th className="p-2 text-right border">Future (PV)</th><th className="p-2 text-right border">Total</th></tr></thead>
+                  <tbody>
+                    <tr><td className="p-2 border">Lost Earning Capacity</td><td className="p-2 border text-right">{fmtUSD(projection.totalPastLoss)}</td><td className="p-2 border text-right">{fmtUSD(projection.totalFuturePV)}</td><td className="p-2 border text-right font-bold">{fmtUSD(projection.totalPastLoss + projection.totalFuturePV)}</td></tr>
+                    {hhServices.active && <tr><td className="p-2 border">Household Services</td><td className="p-2 border text-right">—</td><td className="p-2 border text-right">{fmtUSD(hhsData.totalPV)}</td><td className="p-2 border text-right font-bold">{fmtUSD(hhsData.totalPV)}</td></tr>}
+                    {lcpItems.length > 0 && <tr><td className="p-2 border">Life Care Plan</td><td className="p-2 border text-right">—</td><td className="p-2 border text-right">{fmtUSD(lcpData.totalPV)}</td><td className="p-2 border text-right font-bold">{fmtUSD(lcpData.totalPV)}</td></tr>}
+                    <tr className="bg-slate-100 font-bold"><td className="p-2 border">GRAND TOTAL</td><td className="p-2 border text-right">{fmtUSD(projection.totalPastLoss)}</td><td className="p-2 border text-right">{fmtUSD(projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV)}</td><td className="p-2 border text-right text-lg">{fmtUSD(grandTotal)}</td></tr>
+                  </tbody>
+                </table>
+              </section>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground pb-20 print:bg-white print:pb-0">
-      
-      {/* NAVBAR */}
+      {/* Navbar */}
       <nav className="bg-navy text-primary-foreground sticky top-0 z-50 shadow-lg print:hidden">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -735,903 +323,41 @@ export default function ForensicSuite() {
               <Sigma className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-lg tracking-tight hidden sm:block">ForensicSuite <span className="text-indigo-light font-light">V9</span></h1>
-              <h1 className="font-bold text-lg tracking-tight sm:hidden">FS<span className="text-indigo-light font-light">V9</span></h1>
+              <h1 className="font-bold text-lg tracking-tight">ForensicSuite <span className="text-indigo-light font-light">V10</span></h1>
             </div>
           </div>
-          
-          <div className="hidden md:flex gap-1 bg-navy-light p-1 rounded-lg">
-            {['analysis', 'lcp', 'report'].map(id => (
-              <button key={id} onClick={() => setActiveTab(id)} className={`px-4 py-1.5 text-sm font-medium rounded transition-all ${activeTab===id ? 'bg-indigo shadow-sm text-primary-foreground' : 'text-muted-foreground hover:text-primary-foreground'}`}>
-                {id.charAt(0).toUpperCase() + id.slice(1)}
-              </button>
-            ))}
+          <div className="hidden md:block text-sm text-muted-foreground">
+            Step {currentStep + 1} of {WIZARD_STEPS.length}: {WIZARD_STEPS[currentStep].label}
           </div>
-
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-muted-foreground">
+          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2">
             {mobileMenuOpen ? <X /> : <Menu />}
           </button>
         </div>
       </nav>
 
-      {/* MOBILE MENU */}
+      {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-navy-light border-t border-navy p-4 space-y-2 print:hidden">
-          {['analysis', 'lcp', 'report'].map(id => (
-            <button key={id} onClick={() => { setActiveTab(id); setMobileMenuOpen(false); }} className={`block w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${activeTab===id ? 'bg-indigo text-primary-foreground' : 'text-muted-foreground hover:bg-navy'}`}>
-              {id.toUpperCase()}
+          {WIZARD_STEPS.map((step, idx) => (
+            <button key={step.id} onClick={() => { setCurrentStep(idx); setMobileMenuOpen(false); }} className={`block w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${currentStep === idx ? 'bg-indigo text-primary-foreground' : 'text-muted-foreground hover:bg-navy'}`}>
+              {step.label}
             </button>
           ))}
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 py-6 print:p-0">
+      {/* Wizard Navigation */}
+      <WizardNavigation 
+        steps={WIZARD_STEPS} 
+        currentStep={currentStep} 
+        onStepClick={setCurrentStep}
+        onNext={() => setCurrentStep(Math.min(currentStep + 1, WIZARD_STEPS.length - 1))}
+        onPrevious={() => setCurrentStep(Math.max(currentStep - 1, 0))}
+      />
 
-        {/* --- TAB: ANALYSIS --- */}
-        {activeTab === 'analysis' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-            {/* LEFT COLUMN */}
-            <div className="lg:col-span-4 space-y-5">
-              
-              {/* 1. CASE INFO / DEMOGRAPHICS */}
-              <Card className="p-4 border-l-4 border-l-indigo">
-                <SectionHeader icon={User} title="Case Information" subtitle="Demographics & Identification" />
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Plaintiff Name" type="text" value={caseInfo.plaintiff} onChange={v => setCaseInfo({...caseInfo, plaintiff: v})} placeholder="First Last" />
-                    <InputGroup label="File Number" type="text" value={caseInfo.fileNumber} onChange={v => setCaseInfo({...caseInfo, fileNumber: v})} placeholder="KW-2025-XXX" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Gender" type="text" value={caseInfo.gender} onChange={v => setCaseInfo({...caseInfo, gender: v})} placeholder="Male/Female" />
-                    <InputGroup label="DOB" type="date" value={caseInfo.dob} onChange={v => setCaseInfo({...caseInfo, dob: v})} />
-                  </div>
-                  <InputGroup label="Education" type="text" value={caseInfo.education} onChange={v => setCaseInfo({...caseInfo, education: v})} placeholder="Highest degree, school, location" />
-                  <InputGroup label="Marital Status" type="text" value={caseInfo.maritalStatus} onChange={v => setCaseInfo({...caseInfo, maritalStatus: v})} placeholder="Single, Married, etc." />
-                  <InputGroup label="Dependents" type="text" value={caseInfo.dependents} onChange={v => setCaseInfo({...caseInfo, dependents: v})} placeholder="Number and ages of minor children" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <InputGroup label="City" type="text" value={caseInfo.city} onChange={v => setCaseInfo({...caseInfo, city: v})} />
-                    <InputGroup label="County" type="text" value={caseInfo.county} onChange={v => setCaseInfo({...caseInfo, county: v})} />
-                    <InputGroup label="State" type="text" value={caseInfo.state} onChange={v => setCaseInfo({...caseInfo, state: v})} />
-                  </div>
-                </div>
-              </Card>
-
-              {/* 2. LEGAL FRAMEWORK */}
-              <Card className="p-4 border-l-4 border-l-sky">
-                <SectionHeader icon={Scale} title="Legal Framework" subtitle="Jurisdiction & Retaining Party" />
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Jurisdiction" type="text" value={caseInfo.jurisdiction} onChange={v => setCaseInfo({...caseInfo, jurisdiction: v})} />
-                    <InputGroup label="Case Type" type="text" value={caseInfo.caseType} onChange={v => setCaseInfo({...caseInfo, caseType: v})} placeholder="Personal Injury" />
-                  </div>
-                  <InputGroup label="Retaining Attorney" type="text" value={caseInfo.attorney} onChange={v => setCaseInfo({...caseInfo, attorney: v})} />
-                  <InputGroup label="Law Firm" type="text" value={caseInfo.lawFirm} onChange={v => setCaseInfo({...caseInfo, lawFirm: v})} />
-                  <InputGroup label="Report Date" type="date" value={caseInfo.reportDate} onChange={v => setCaseInfo({...caseInfo, reportDate: v})} />
-                </div>
-              </Card>
-
-              {/* 3. DATES & VOCATIONAL */}
-              <Card className="p-4 border-l-4 border-l-emerald">
-                <SectionHeader icon={CalendarIcon} title="Dates & Duration" subtitle="Calculates Ages & Work Life" />
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Date of Injury" type="date" value={caseInfo.dateOfInjury} onChange={v => setCaseInfo({...caseInfo, dateOfInjury: v})} />
-                    <InputGroup label="Valuation Date" type="date" value={caseInfo.dateOfTrial} onChange={v => setCaseInfo({...caseInfo, dateOfTrial: v})} />
-                  </div>
-                  
-                  <div className="bg-emerald/10 p-3 rounded-lg border border-emerald/20 text-xs grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <span className="block text-muted-foreground">Current Age</span>
-                      <strong className="text-foreground">{dateCalc.currentAge}</strong>
-                    </div>
-                    <div>
-                      <span className="block text-muted-foreground">Age at Injury</span>
-                      <strong className="text-foreground">{dateCalc.ageInjury}</strong>
-                    </div>
-                    <div>
-                      <span className="block text-muted-foreground">Age at Trial</span>
-                      <strong className="text-foreground">{dateCalc.ageTrial}</strong>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Life Expectancy (Yrs)" value={caseInfo.lifeExpectancy} suffix="Yrs" onChange={v => setCaseInfo({...caseInfo, lifeExpectancy: parseFloat(v) || 0})} />
-                    <InputGroup label="Retirement Age" value={caseInfo.retirementAge} onChange={v => setCaseInfo({...caseInfo, retirementAge: parseFloat(v) || 0})} />
-                  </div>
-                  <InputGroup label="Work Life Expectancy (WLE)" suffix="Yrs" value={earningsParams.wle} onChange={v => setEarningsParams({...earningsParams, wle: parseFloat(v) || 0})} />
-                  
-                  <div className="bg-muted p-3 rounded-lg text-xs grid grid-cols-2 gap-2 text-center">
-                    <div>
-                      <span className="block text-muted-foreground">Years to Separation</span>
-                      <strong className="text-foreground">{dateCalc.derivedYFS.toFixed(2)}</strong>
-                    </div>
-                    <div>
-                      <span className="block text-muted-foreground">Work Life Factor</span>
-                      <strong className="text-foreground">{workLifeFactor.toFixed(2)}%</strong>
-                    </div>
-                  </div>
-
-                  <InputGroup label="WLE Source" type="text" value={caseInfo.wleSource} onChange={v => setCaseInfo({...caseInfo, wleSource: v})} />
-                  <InputGroup label="Life Table Source" type="text" value={caseInfo.lifeTableSource} onChange={v => setCaseInfo({...caseInfo, lifeTableSource: v})} />
-                </div>
-              </Card>
-
-              {/* 4. PAST ACTUALS */}
-              <Card className="p-4 border-l-4 border-l-rose max-h-[250px] overflow-y-auto">
-                <SectionHeader icon={History} title="Past Actual Earnings" subtitle="Offset against but-for" />
-                <div className="space-y-2">
-                  {projection.pastSchedule.length === 0 && (
-                    <p className="text-xs text-muted-foreground italic">Enter dates above to generate past years</p>
-                  )}
-                  {projection.pastSchedule.map((row) => (
-                    <div key={row.year} className="flex items-center gap-3">
-                      <div className="w-1/3">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">{row.year}</label>
-                      </div>
-                      <div className="w-2/3">
-                        <input 
-                          type="number" 
-                          className="block w-full rounded-md border-border py-1 text-sm bg-background text-foreground" 
-                          placeholder="Actual Gross $"
-                          value={pastActuals[row.year] || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setPastActuals(prev => ({ ...prev, [row.year]: val }));
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-
-            {/* MIDDLE COLUMN */}
-            <div className="lg:col-span-4 space-y-5">
-              
-              {/* EARNINGS CAPACITY */}
-              <Card className="p-4 border-l-4 border-l-indigo">
-                <SectionHeader icon={Briefcase} title="Earnings Capacity" subtitle="Pre and Post Injury" />
-                <div className="space-y-2">
-                  <InputGroup label="Pre-Injury Base Earnings (Annual)" prefix="$" value={earningsParams.baseEarnings} onChange={v => setEarningsParams({...earningsParams, baseEarnings: parseFloat(v) || 0})} />
-                  <InputGroup label="Post-Injury Residual Earnings (Annual)" prefix="$" value={earningsParams.residualEarnings} onChange={v => setEarningsParams({...earningsParams, residualEarnings: parseFloat(v) || 0})} />
-                </div>
-              </Card>
-
-              {/* FRINGE BENEFITS */}
-              <Card className="p-4 border-l-4 border-l-sky">
-                <div className="flex justify-between items-center mb-3">
-                  <SectionHeader icon={HeartPulse} title="Fringe Benefits" subtitle="Employer-paid benefits" />
-                  <label className="text-[10px] flex items-center gap-1 cursor-pointer bg-muted px-2 py-1 rounded">
-                    <input type="checkbox" checked={isUnionMode} onChange={e => setIsUnionMode(e.target.checked)} />
-                    Union Mode
-                  </label>
-                </div>
-                
-                {isUnionMode ? (
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-muted-foreground mb-2">Enter annualized union benefit amounts:</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <InputGroup label="Pension ($/yr)" prefix="$" value={earningsParams.pension} onChange={v => setEarningsParams({...earningsParams, pension: parseFloat(v) || 0})} />
-                      <InputGroup label="Health & Welfare ($/yr)" prefix="$" value={earningsParams.healthWelfare} onChange={v => setEarningsParams({...earningsParams, healthWelfare: parseFloat(v) || 0})} />
-                      <InputGroup label="Annuity ($/yr)" prefix="$" value={earningsParams.annuity} onChange={v => setEarningsParams({...earningsParams, annuity: parseFloat(v) || 0})} />
-                      <InputGroup label="Clothing Allow ($/yr)" prefix="$" value={earningsParams.clothingAllowance} onChange={v => setEarningsParams({...earningsParams, clothingAllowance: parseFloat(v) || 0})} />
-                    </div>
-                    <InputGroup label="Other Benefits ($/yr)" prefix="$" value={earningsParams.otherBenefits} onChange={v => setEarningsParams({...earningsParams, otherBenefits: parseFloat(v) || 0})} />
-                    <div className="bg-sky/10 p-2 rounded text-xs text-center">
-                      <span className="text-muted-foreground">Total Annual Fringe: </span>
-                      <strong>{fmtUSD(algebraic.flatFringeAmount)}</strong>
-                      <span className="text-muted-foreground ml-2">({earningsParams.baseEarnings > 0 ? ((algebraic.flatFringeAmount / earningsParams.baseEarnings) * 100).toFixed(1) : 0}% of base)</span>
-                    </div>
-                  </div>
-                ) : (
-                  <InputGroup label="ECEC Loading Rate" suffix="%" value={earningsParams.fringeRate} onChange={v => setEarningsParams({...earningsParams, fringeRate: parseFloat(v) || 0})} />
-                )}
-              </Card>
-
-              {/* ECONOMIC FACTORS */}
-              <Card className="p-4 border-l-4 border-l-emerald">
-                <SectionHeader icon={TrendingUp} title="Economic Variables" />
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-bold uppercase text-muted-foreground">Growth & Discounting</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Wage Growth Rate" suffix="%" value={earningsParams.wageGrowth} onChange={v => setEarningsParams({...earningsParams, wageGrowth: parseFloat(v) || 0})} />
-                    <InputGroup label="Discount Rate" suffix="%" value={earningsParams.discountRate} onChange={v => setEarningsParams({...earningsParams, discountRate: parseFloat(v) || 0})} />
-                  </div>
-                  
-                  <h4 className="text-[10px] font-bold uppercase text-muted-foreground pt-2">Unemployment Adjustment</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Unemployment Rate" suffix="%" value={earningsParams.unemploymentRate} onChange={v => setEarningsParams({...earningsParams, unemploymentRate: parseFloat(v) || 0})} />
-                    <InputGroup label="UI Replacement Rate" suffix="%" value={earningsParams.uiReplacementRate} onChange={v => setEarningsParams({...earningsParams, uiReplacementRate: parseFloat(v) || 0})} />
-                  </div>
-
-                  <h4 className="text-[10px] font-bold uppercase text-muted-foreground pt-2">Tax Rates</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <InputGroup label="Federal Tax Rate" suffix="%" value={earningsParams.fedTaxRate} onChange={v => setEarningsParams({...earningsParams, fedTaxRate: parseFloat(v) || 0})} />
-                    <InputGroup label="State Tax Rate" suffix="%" value={earningsParams.stateTaxRate} onChange={v => setEarningsParams({...earningsParams, stateTaxRate: parseFloat(v) || 0})} />
-                  </div>
-                  <div className="bg-muted p-2 rounded text-xs text-center">
-                    <span className="text-muted-foreground">Combined Tax Rate: </span>
-                    <strong>{fmtPct(algebraic.combinedTaxRate)}</strong>
-                  </div>
-                </div>
-              </Card>
-
-              {/* HOUSEHOLD SERVICES */}
-              <Card className="p-4 border-l-4 border-l-rose">
-                <div className="flex justify-between items-center mb-3">
-                  <SectionHeader icon={Home} title="Household Services" subtitle="Loss of domestic capacity" />
-                  <label className="flex items-center gap-2 text-xs font-bold text-foreground">
-                    <input type="checkbox" checked={hhServices.active} onChange={e => setHhServices({...hhServices, active: e.target.checked})} className="w-4 h-4 rounded" />
-                    Include
-                  </label>
-                </div>
-                {hhServices.active && (
-                  <div className="space-y-2 animate-fade-in">
-                    <div className="grid grid-cols-2 gap-2">
-                      <InputGroup label="Lost Hours/Week" value={hhServices.hoursPerWeek} onChange={v => setHhServices({...hhServices, hoursPerWeek: parseFloat(v) || 0})} />
-                      <InputGroup label="Hourly Rate" prefix="$" value={hhServices.hourlyRate} onChange={v => setHhServices({...hhServices, hourlyRate: parseFloat(v) || 0})} />
-                    </div>
-                    <InputGroup label="Growth Rate" suffix="%" value={hhServices.growthRate} onChange={v => setHhServices({...hhServices, growthRate: parseFloat(v) || 0})} />
-                    <div className="bg-rose/10 rounded-lg p-2 text-center">
-                      <span className="block text-[10px] uppercase font-bold text-rose">Total HH Services PV</span>
-                      <span className="font-bold text-rose text-lg">{fmtUSD(hhsData.totalPV)}</span>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            </div>
-
-            {/* RIGHT COLUMN */}
-            <div className="lg:col-span-4 space-y-5">
-              
-              {/* NARRATIVES */}
-              <Card className="p-4 border-l-4 border-l-accent">
-                <SectionHeader icon={BookOpen} title="Narrative Sections" subtitle="For Report Body" />
-                <div className="space-y-1">
-                  <TextArea label="Medical Summary" value={caseInfo.medicalSummary} onChange={v => setCaseInfo({...caseInfo, medicalSummary: v})} placeholder="Briefly describe injuries and medical treatment..." rows={2} />
-                  <TextArea label="Employment History" value={caseInfo.employmentHistory} onChange={v => setCaseInfo({...caseInfo, employmentHistory: v})} placeholder="List job history with dates and positions..." rows={2} />
-                  <TextArea label="Earnings History" value={caseInfo.earningsHistory} onChange={v => setCaseInfo({...caseInfo, earningsHistory: v})} placeholder="W-2s, 1040s, earnings documentation..." rows={2} />
-                  <TextArea label="Pre-Injury Capacity" value={caseInfo.preInjuryCapacity} onChange={v => setCaseInfo({...caseInfo, preInjuryCapacity: v})} placeholder="Describe pre-injury earning capacity basis..." rows={2} />
-                  <TextArea label="Post-Injury Capacity" value={caseInfo.postInjuryCapacity} onChange={v => setCaseInfo({...caseInfo, postInjuryCapacity: v})} placeholder="Describe post-injury residual capacity..." rows={2} />
-                  <TextArea label="Functional Limitations" value={caseInfo.functionalLimitations} onChange={v => setCaseInfo({...caseInfo, functionalLimitations: v})} placeholder="Describe functional limitations and future employability..." rows={2} />
-                </div>
-              </Card>
-
-              {/* RESULTS SUMMARY */}
-              <Card className="p-4 bg-navy text-primary-foreground border-none">
-                <h4 className="text-[10px] font-bold uppercase text-muted-foreground mb-3">Damage Summary</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Past Lost Earnings:</span>
-                    <span className="font-bold">{fmtUSD(projection.totalPastLoss)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Future Lost Earnings (PV):</span>
-                    <span className="font-bold">{fmtUSD(projection.totalFuturePV)}</span>
-                  </div>
-                  {hhServices.active && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Household Services (PV):</span>
-                      <span className="font-bold">{fmtUSD(hhsData.totalPV)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Life Care Plan (PV):</span>
-                    <span className="font-bold">{fmtUSD(lcpData.totalPV)}</span>
-                  </div>
-                  <div className="border-t border-muted-foreground/30 pt-2 mt-2 flex justify-between">
-                    <span className="text-muted-foreground font-bold">GRAND TOTAL:</span>
-                    <span className="text-2xl font-bold text-emerald">{fmtUSD(grandTotal)}</span>
-                  </div>
-                </div>
-              </Card>
-
-              {/* TABLE */}
-              <Card className="flex flex-col h-[350px]">
-                <div className="bg-muted border-b border-border p-2 flex justify-between items-center">
-                  <span className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2"><Table className="w-4 h-4"/> Damage Schedule</span>
-                  <button onClick={copyTable} className="text-xs bg-background border border-border px-2 py-1 rounded shadow-sm hover:bg-muted flex items-center gap-1 text-muted-foreground">
-                    {copySuccess ? <Check className="w-3 h-3 text-emerald"/> : <Copy className="w-3 h-3"/>} Copy
-                  </button>
-                </div>
-                <div className="overflow-auto flex-1 bg-card">
-                  <table className="w-full text-xs text-right border-collapse">
-                    <thead className="bg-muted text-muted-foreground font-bold sticky top-0 z-10 shadow-sm">
-                      <tr>
-                        <th className="p-2 text-left">Year</th>
-                        <th className="p-2">Gross</th>
-                        <th className="p-2 bg-indigo-muted text-indigo">Net Loss</th>
-                        <th className="p-2">PV</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border font-mono">
-                      {projection.pastSchedule.map((row) => (
-                        <tr key={row.year} className="bg-muted/30">
-                          <td className="p-2 text-left text-muted-foreground">{row.year} <span className="opacity-75 text-[9px]">PAST</span></td>
-                          <td className="p-2 text-muted-foreground">{fmtUSD(row.grossBase)}</td>
-                          <td className="p-2 bg-indigo-muted/50 text-indigo font-medium">{fmtUSD(row.netLoss)}</td>
-                          <td className="p-2 text-muted-foreground">-</td>
-                        </tr>
-                      ))}
-                      {projection.futureSchedule.map((row) => (
-                        <tr key={row.year} className="hover:bg-muted/50">
-                          <td className="p-2 text-left text-muted-foreground">{row.year}</td>
-                          <td className="p-2 text-foreground">{fmtUSD(row.gross)}</td>
-                          <td className="p-2 bg-indigo-muted/30 text-indigo font-bold">{fmtUSD(row.netLoss)}</td>
-                          <td className="p-2 text-foreground font-bold">{fmtUSD(row.pv)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB: LCP --- */}
-        {activeTab === 'lcp' && (
-          <div className="animate-fade-in space-y-4">
-            <Card>
-              <div className="p-4 border-b border-border bg-muted flex justify-between items-center">
-                <div>
-                  <h2 className="font-bold text-foreground">Life Care Plan</h2>
-                  <p className="text-xs text-muted-foreground">Future cost of healthcare services</p>
-                </div>
-                <button onClick={() => setLcpItems([...lcpItems, {id: Date.now(), categoryId: 'evals', name:'New Item', baseCost:0, freqType:'annual', duration: Math.ceil(caseInfo.lifeExpectancy || 25), startYear:1, cpi: 2.88, recurrenceInterval:1}])} className="bg-indigo text-primary-foreground px-3 py-1.5 rounded-full text-sm hover:bg-indigo-light flex gap-2 items-center shadow-lg transform active:scale-95 transition-all"><Plus className="w-4 h-4"/> Add Item</button>
-              </div>
-              <div className="p-4 grid grid-cols-1 gap-3">
-                {lcpItems.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">No life care plan items yet. Click "Add Item" to begin.</p>
-                )}
-                {lcpItems.map(item => (
-                  <div key={item.id} className="relative bg-card border border-border p-3 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                      <div className="md:col-span-2">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Category</label>
-                        <select className="w-full text-sm font-medium bg-muted rounded border-none py-1.5 focus:ring-1 focus:ring-primary text-foreground" value={item.categoryId} onChange={(e) => {
-                          const cat = CPI_CATEGORIES.find(c=>c.id===e.target.value);
-                          setLcpItems(lcpItems.map(i=>i.id===item.id?{...i, categoryId:e.target.value, cpi:cat?cat.rate:0}:i));
-                        }}>
-                          {CPI_CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
-                        </select>
-                      </div>
-                      <div className="md:col-span-3">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Description</label>
-                        <input className="w-full text-sm font-medium bg-muted rounded border-none py-1.5 text-foreground" value={item.name} onChange={e=>setLcpItems(lcpItems.map(i=>i.id===item.id?{...i, name:e.target.value}:i))}/>
-                      </div>
-                      <div className="md:col-span-1">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Cost ($)</label>
-                        <input type="number" className="w-full text-sm font-medium bg-muted rounded border-none py-1.5 text-foreground" value={item.baseCost} onChange={e=>setLcpItems(lcpItems.map(i=>i.id===item.id?{...i, baseCost:parseFloat(e.target.value) || 0}:i))}/>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Frequency</label>
-                        <select className="w-full text-sm font-medium bg-muted rounded border-none py-1.5 text-foreground" value={item.freqType} onChange={e=>setLcpItems(lcpItems.map(i=>i.id===item.id?{...i, freqType:e.target.value}:i))}>
-                          <option value="annual">Annual</option>
-                          <option value="onetime">One Time</option>
-                          <option value="recurring">Recurring (Every X Yrs)</option>
-                        </select>
-                      </div>
-                      <div className="md:col-span-1">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Duration</label>
-                        <input type="number" className="w-full text-sm font-medium bg-muted rounded border-none py-1.5 text-foreground" value={item.duration} onChange={e=>setLcpItems(lcpItems.map(i=>i.id===item.id?{...i, duration:parseInt(e.target.value) || 1}:i))}/>
-                      </div>
-                      <div className="md:col-span-1">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Start Yr</label>
-                        <input type="number" className="w-full text-sm font-medium bg-muted rounded border-none py-1.5 text-foreground" value={item.startYear} onChange={e=>setLcpItems(lcpItems.map(i=>i.id===item.id?{...i, startYear:parseInt(e.target.value) || 1}:i))}/>
-                      </div>
-                      <div className="md:col-span-1">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">CPI %</label>
-                        <input type="number" step="0.01" className="w-full text-sm font-medium bg-muted rounded border-none py-1.5 text-foreground" value={item.cpi} onChange={e=>setLcpItems(lcpItems.map(i=>i.id===item.id?{...i, cpi:parseFloat(e.target.value) || 0}:i))}/>
-                      </div>
-                      <div className="md:col-span-1 flex items-end justify-end gap-2">
-                        <button onClick={()=>setLcpItems(lcpItems.filter(i=>i.id!==item.id))} className="text-muted-foreground hover:text-rose p-1"><Trash2 className="w-4 h-4"/></button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {lcpItems.length > 0 && (
-                <div className="p-4 bg-muted border-t border-border flex justify-between items-center">
-                  <span className="text-sm font-bold text-foreground">Life Care Plan Total (Present Value):</span>
-                  <span className="text-xl font-bold text-indigo">{fmtUSD(lcpData.totalPV)}</span>
-                </div>
-              )}
-            </Card>
-          </div>
-        )}
-
-        {/* --- TAB: REPORT --- */}
-        {activeTab === 'report' && (
-          <div ref={reportRef} className="bg-white shadow-2xl max-w-[21cm] mx-auto min-h-[29.7cm] p-[1.5cm] print:shadow-none print:p-0 print:w-full animate-fade-in text-slate-900 text-[11pt] leading-relaxed">
-            
-            {/* COVER PAGE HEADER */}
-            <div className="text-center mb-8 pb-6 border-b-2 border-slate-900">
-              <h1 className="text-2xl font-serif font-bold text-slate-900 mb-2">APPRAISAL OF ECONOMIC LOSS</h1>
-              <div className="text-sm font-serif text-slate-600 mt-4">
-                <strong>PREPARED BY:</strong> Kincaid Wolstein Vocational and Rehabilitation Services<br/>
-                One University Plaza ~ Suite 302<br/>
-                Hackensack, New Jersey 07601<br/>
-                Phone: (201) 343-0700
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-8 mb-8 text-sm font-serif">
-              <div>
-                <p><strong>PREPARED FOR:</strong> {caseInfo.attorney || '[Attorney Name]'}</p>
-                <p>{caseInfo.lawFirm || '[Law Firm]'}</p>
-              </div>
-              <div className="text-right">
-                <p><strong>REGARDING:</strong> {caseInfo.plaintiff || '[Plaintiff Name]'}</p>
-                <p><strong>DATE OF BIRTH:</strong> {caseInfo.dob ? new Date(caseInfo.dob).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '[DOB]'}</p>
-                <p><strong>REPORT DATE:</strong> {caseInfo.reportDate ? new Date(caseInfo.reportDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '[Report Date]'}</p>
-              </div>
-            </div>
-
-            {/* CERTIFICATION */}
-            <section className="mb-8 break-inside-avoid">
-              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Certification</h2>
-              <p className="font-serif text-justify text-[10pt] leading-relaxed text-slate-700">
-                This is to certify that we are not related to any of the parties to the subject action, nor do we have any present or intended financial interest in this case beyond the fees due for professional services rendered in connection with this report and possible subsequent services. Further, we certify that our professional fees are not contingent on the outcome of this matter but are based on the services provided to counsel in connection with subject action. This is to further certify that all assumptions, methodologies, and calculations utilized in this appraisal report are based on current knowledge and methods applied to the determination of projected pecuniary losses, consistent with accepted practices in forensic economics.
-              </p>
-            </section>
-
-            {/* PURPOSE */}
-            <section className="mb-8 break-inside-avoid">
-              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Purpose of Appraisal</h2>
-              <p className="font-serif text-justify text-[10pt] leading-relaxed text-slate-700">
-                Kincaid Wolstein Vocational and Rehabilitation Services was retained by {caseInfo.lawFirm || '[Law Firm]'} to evaluate the economic losses of {caseInfo.plaintiff || '[Plaintiff Name]'} arising from {caseInfo.caseType === 'Personal Injury' ? 'an injury' : 'an event'} on {caseInfo.dateOfInjury ? new Date(caseInfo.dateOfInjury).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '[Date of Injury]'}. The purpose of this appraisal is to quantify past and future losses in wages, fringe benefits, and related employment earnings by integrating case-specific documentation with authoritative labor-market and demographic data, and by applying standard forensic economic methods. {lcpItems.length > 0 ? 'There was also an analysis of future cost of healthcare services.' : ''} {hhServices.active ? 'Loss of household services was also analyzed.' : ''}
-              </p>
-            </section>
-
-            {/* OPINION */}
-            <section className="mb-8">
-              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Opinion of Economic Losses</h2>
-              <p className="font-serif text-justify mb-4 text-[10pt] leading-relaxed text-slate-700">
-                Within a reasonable degree of economic certainty, and subject to the assumptions and limitations set forth in this report, it is my professional opinion that {caseInfo.plaintiff || '[Plaintiff Name]'} has sustained compensable economic losses arising from lost earning capacity and associated employment benefits. The table below summarizes past, future, and total economic losses.
-              </p>
-              
-              <table className="w-full border border-slate-400 text-[10pt] font-serif mb-4">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="p-2 text-left border-r border-slate-300 font-bold">Category</th>
-                    <th className="p-2 text-right border-r border-slate-300 font-bold">Past Value</th>
-                    <th className="p-2 text-right border-r border-slate-300 font-bold">Future (PV)</th>
-                    <th className="p-2 text-right font-bold">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t border-slate-300">
-                    <td className="p-2 border-r border-slate-300">Lost Earning Capacity</td>
-                    <td className="p-2 text-right border-r border-slate-300">{fmtUSD(projection.totalPastLoss)}</td>
-                    <td className="p-2 text-right border-r border-slate-300">{fmtUSD(projection.totalFuturePV)}</td>
-                    <td className="p-2 text-right font-bold">{fmtUSD(projection.totalPastLoss + projection.totalFuturePV)}</td>
-                  </tr>
-                  {hhServices.active && (
-                    <tr className="border-t border-slate-300">
-                      <td className="p-2 border-r border-slate-300">Household Services</td>
-                      <td className="p-2 text-right border-r border-slate-300 text-slate-400">—</td>
-                      <td className="p-2 text-right border-r border-slate-300">{fmtUSD(hhsData.totalPV)}</td>
-                      <td className="p-2 text-right font-bold">{fmtUSD(hhsData.totalPV)}</td>
-                    </tr>
-                  )}
-                  {lcpItems.length > 0 && (
-                    <tr className="border-t border-slate-300">
-                      <td className="p-2 border-r border-slate-300">Future Cost of Healthcare</td>
-                      <td className="p-2 text-right border-r border-slate-300 text-slate-400">—</td>
-                      <td className="p-2 text-right border-r border-slate-300">{fmtUSD(lcpData.totalPV)}</td>
-                      <td className="p-2 text-right font-bold">{fmtUSD(lcpData.totalPV)}</td>
-                    </tr>
-                  )}
-                  <tr className="border-t-2 border-slate-900 bg-slate-50 font-bold">
-                    <td className="p-2 border-r border-slate-300">GRAND TOTAL</td>
-                    <td className="p-2 text-right border-r border-slate-300">{fmtUSD(projection.totalPastLoss)}</td>
-                    <td className="p-2 text-right border-r border-slate-300">{fmtUSD(projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV)}</td>
-                    <td className="p-2 text-right text-lg">{fmtUSD(grandTotal)}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <p className="text-[9pt] text-slate-500 italic">
-                Exclusions: This appraisal does not address non-economic damages such as pain and suffering, loss of enjoyment of life, or emotional distress, unless explicitly stated otherwise.
-              </p>
-            </section>
-
-            {/* BACKGROUND FACTS */}
-            <section className="mb-8 break-inside-avoid">
-              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Background Facts and Assumptions</h2>
-              
-              <h3 className="font-bold text-slate-800 mb-2 text-[10pt]">Summary Information</h3>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[10pt] font-serif mb-4">
-                <p><strong>Plaintiff:</strong> {caseInfo.plaintiff} ({caseInfo.gender})</p>
-                <p><strong>Date of Birth:</strong> {caseInfo.dob ? new Date(caseInfo.dob).toLocaleDateString() : '—'}</p>
-                <p><strong>Date of Injury:</strong> {caseInfo.dateOfInjury ? new Date(caseInfo.dateOfInjury).toLocaleDateString() : '—'}</p>
-                <p><strong>Residence:</strong> {[caseInfo.city, caseInfo.county, caseInfo.state].filter(Boolean).join(', ') || '—'}</p>
-                <p><strong>Education:</strong> {caseInfo.education || '—'}</p>
-                <p><strong>Marital Status:</strong> {caseInfo.maritalStatus}{caseInfo.dependents ? `; ${caseInfo.dependents}` : ''}</p>
-                <p><strong>Current Age:</strong> {dateCalc.currentAge} years</p>
-                <p><strong>Age at Injury:</strong> {dateCalc.ageInjury} years</p>
-                <p><strong>Life Expectancy:</strong> {caseInfo.lifeExpectancy || '—'} years</p>
-                <p><strong>Work Life Expectancy:</strong> {earningsParams.wle} years</p>
-                <p><strong>Years to Separation:</strong> {dateCalc.derivedYFS.toFixed(2)} years</p>
-                <p><strong>Work Life Factor:</strong> {workLifeFactor.toFixed(2)}%</p>
-                <p><strong>Growth Rate:</strong> {earningsParams.wageGrowth}%</p>
-                <p><strong>Discount Rate:</strong> {earningsParams.discountRate}%</p>
-              </div>
-              
-              {caseInfo.medicalSummary && (
-                <div className="mb-3">
-                  <h3 className="font-bold text-slate-800 mb-1 text-[10pt]">Medical Summary</h3>
-                  <p className="text-justify text-slate-600 text-[10pt]">{caseInfo.medicalSummary}</p>
-                </div>
-              )}
-              {caseInfo.employmentHistory && (
-                <div className="mb-3">
-                  <h3 className="font-bold text-slate-800 mb-1 text-[10pt]">Occupation and Employment</h3>
-                  <p className="text-justify text-slate-600 text-[10pt]">{caseInfo.employmentHistory}</p>
-                </div>
-              )}
-              {caseInfo.earningsHistory && (
-                <div className="mb-3">
-                  <h3 className="font-bold text-slate-800 mb-1 text-[10pt]">Earnings History</h3>
-                  <p className="text-justify text-slate-600 text-[10pt]">{caseInfo.earningsHistory}</p>
-                </div>
-              )}
-              {caseInfo.preInjuryCapacity && (
-                <div className="mb-3">
-                  <h3 className="font-bold text-slate-800 mb-1 text-[10pt]">Pre-Injury Earnings Capacity</h3>
-                  <p className="text-justify text-slate-600 text-[10pt]">{caseInfo.preInjuryCapacity}</p>
-                </div>
-              )}
-              {caseInfo.postInjuryCapacity && (
-                <div className="mb-3">
-                  <h3 className="font-bold text-slate-800 mb-1 text-[10pt]">Post-Injury Earnings Capacity</h3>
-                  <p className="text-justify text-slate-600 text-[10pt]">{caseInfo.postInjuryCapacity}</p>
-                </div>
-              )}
-              {caseInfo.functionalLimitations && (
-                <div className="mb-3">
-                  <h3 className="font-bold text-slate-800 mb-1 text-[10pt]">Functionality and Future Employability</h3>
-                  <p className="text-justify text-slate-600 text-[10pt]">{caseInfo.functionalLimitations}</p>
-                </div>
-              )}
-            </section>
-
-            {/* FRINGE BENEFITS */}
-            <section className="mb-8 break-inside-avoid">
-              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Fringe Benefits</h2>
-              {isUnionMode ? (
-                <div className="text-[10pt]">
-                  <h3 className="font-bold text-slate-800 mb-2">Fringe Benefits – Union Plan Method</h3>
-                  <p className="mb-2">Payroll and benefit-plan records indicate the following employer-paid fringe benefits:</p>
-                  <ul className="list-disc ml-6 mb-2">
-                    <li>Pension Fund: {fmtUSD(earningsParams.pension)} per year</li>
-                    <li>Health and Welfare Fund: {fmtUSD(earningsParams.healthWelfare)} per year</li>
-                    <li>Annuity or Defined Contribution Fund: {fmtUSD(earningsParams.annuity)} per year</li>
-                    <li>Clothing/Uniform Allowance: {fmtUSD(earningsParams.clothingAllowance)} per year</li>
-                    <li>Other Benefits: {fmtUSD(earningsParams.otherBenefits)} per year</li>
-                  </ul>
-                  <p><strong>Total Annual Union Fringe Benefits:</strong> {fmtUSD(algebraic.flatFringeAmount)}</p>
-                  <p><strong>Union Fringe Loading Rate:</strong> {earningsParams.baseEarnings > 0 ? ((algebraic.flatFringeAmount / earningsParams.baseEarnings) * 100).toFixed(2) : 0}%</p>
-                </div>
-              ) : (
-                <div className="text-[10pt]">
-                  <h3 className="font-bold text-slate-800 mb-2">Fringe Benefits – ECEC Benchmark Method</h3>
-                  <p>For this analysis, fringe benefits are estimated using the U.S. Bureau of Labor Statistics Employer Costs for Employee Compensation (ECEC) series. The ECEC discretionary fringe rate applied is <strong>{earningsParams.fringeRate}%</strong>.</p>
-                </div>
-              )}
-            </section>
-
-            {/* ADJUSTED EARNINGS FACTOR */}
-            <section className="mb-8 break-inside-avoid">
-              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Adjusted Earnings Factor (AEF) – Algebraic Method</h2>
-              <p className="font-serif text-[10pt] mb-3">
-                The Adjusted Earnings Factor combines several adjustments into a single multiplicative term, following the methodology established by Tinari (2016).
-              </p>
-              <table className="w-full text-[10pt] font-serif border border-slate-400">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="p-2 text-left border-r border-slate-300 font-bold">Component</th>
-                    <th className="p-2 text-right border-r border-slate-300 font-bold">Value</th>
-                    <th className="p-2 text-right font-bold">Cumulative</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t border-slate-300">
-                    <td className="p-2 border-r border-slate-300">Work Life Factor (WLE/YFS)</td>
-                    <td className="p-2 text-right border-r border-slate-300">{algebraic.wlf.toFixed(4)}</td>
-                    <td className="p-2 text-right">{algebraic.wlf.toFixed(4)}</td>
-                  </tr>
-                  <tr className="border-t border-slate-300">
-                    <td className="p-2 border-r border-slate-300">Net Unemployment Factor (1 − UF × [1 − UI])</td>
-                    <td className="p-2 text-right border-r border-slate-300">{algebraic.unempFactor.toFixed(4)}</td>
-                    <td className="p-2 text-right">{(algebraic.wlf * algebraic.unempFactor).toFixed(4)}</td>
-                  </tr>
-                  <tr className="border-t border-slate-300">
-                    <td className="p-2 border-r border-slate-300">After-Tax Factor (1 − TR)</td>
-                    <td className="p-2 text-right border-r border-slate-300">{algebraic.afterTaxFactor.toFixed(4)}</td>
-                    <td className="p-2 text-right">{(algebraic.wlf * algebraic.unempFactor * algebraic.afterTaxFactor).toFixed(4)}</td>
-                  </tr>
-                  <tr className="border-t border-slate-300 bg-indigo-50 font-bold">
-                    <td className="p-2 border-r border-slate-300">Fringe Benefit Factor (1 + FB)</td>
-                    <td className="p-2 text-right border-r border-slate-300">{algebraic.fringeFactor.toFixed(4)}</td>
-                    <td className="p-2 text-right border-l-4 border-indigo-500">{algebraic.fullMultiplier.toFixed(5)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </section>
-
-            {/* LCP SUMMARY IN REPORT */}
-            {lcpItems.length > 0 && (
-              <section className="mb-8 break-inside-avoid">
-                <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Future Cost of Healthcare</h2>
-                <table className="w-full text-[10pt] font-serif border border-slate-400">
-                  <thead className="bg-slate-100">
-                    <tr>
-                      <th className="p-2 text-left border-r border-slate-300 font-bold">Service Category</th>
-                      <th className="p-2 text-left border-r border-slate-300 font-bold">Description</th>
-                      <th className="p-2 text-right border-r border-slate-300 font-bold">Base Cost</th>
-                      <th className="p-2 text-right border-r border-slate-300 font-bold">CPI %</th>
-                      <th className="p-2 text-right font-bold">Present Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lcpData.items.map((item, idx) => (
-                      <tr key={idx} className="border-t border-slate-300">
-                        <td className="p-2 border-r border-slate-300">{CPI_CATEGORIES.find(c => c.id === item.categoryId)?.label || item.categoryId}</td>
-                        <td className="p-2 border-r border-slate-300">{item.name}</td>
-                        <td className="p-2 text-right border-r border-slate-300">{fmtUSD(item.baseCost)}</td>
-                        <td className="p-2 text-right border-r border-slate-300">{item.cpi}%</td>
-                        <td className="p-2 text-right font-bold">{fmtUSD(item.totalPV)}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-slate-900 bg-slate-50 font-bold">
-                      <td colSpan={4} className="p-2 border-r border-slate-300 text-right">TOTAL LIFE CARE PLAN (PV)</td>
-                      <td className="p-2 text-right">{fmtUSD(lcpData.totalPV)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            {/* ==================== APPENDIX - TERMINOLOGY ==================== */}
-            <div className="break-before-page" />
-            <section className="mb-8">
-              <h2 className="text-lg font-bold font-serif uppercase border-b-2 border-slate-900 pb-2 mb-6 text-center">APPENDIX – TERMINOLOGY AND METHODOLOGY</h2>
-              
-              {/* Life Expectancy */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Life Expectancy</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Life expectancy is the average number of years remaining for a person of a given age, sex, and demographic profile, based on actuarial mortality tables. For this appraisal, life expectancy is drawn from {caseInfo.lifeTableSource || 'the most recent United States life tables published by the National Center for Health Statistics'}. The remaining life expectancy of {caseInfo.lifeExpectancy || '[X.XX]'} years is used as the planning horizon for life care plan items that extend through the end of life.
-                </p>
-              </div>
-
-              {/* Work Life Expectancy */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Work Life Expectancy</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Work life expectancy (WLE) is the expected number of years a person will remain in the labor force, accounting for periods of employment, unemployment, and labor-force withdrawal. WLE differs from life expectancy because not all remaining years of life are spent working. For this appraisal, WLE of {earningsParams.wle} years is based on {caseInfo.wleSource || 'authoritative work life expectancy tables'}, adjusted as appropriate for {caseInfo.plaintiff ? `${caseInfo.plaintiff}'s` : "the plaintiff's"} age, sex, education, and employment pattern.
-                </p>
-              </div>
-
-              {/* Years to Final Separation */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Years to Final Separation</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Years to Final Separation (YFS) is the number of years from the valuation date to the assumed retirement or final separation from the labor force. For this appraisal, YFS is calculated as {dateCalc.derivedYFS.toFixed(2)} years, representing the time from the valuation date of {caseInfo.dateOfTrial ? new Date(caseInfo.dateOfTrial).toLocaleDateString() : '[Valuation Date]'} until the assumed retirement age of {caseInfo.retirementAge}.
-                </p>
-              </div>
-
-              {/* Work Life Factor */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Work Life Factor</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  The Work Life Factor (WLF) represents the ratio of expected work life to years from the valuation date to assumed retirement or final separation. It is calculated as:
-                </p>
-                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
-                  WLF = WLE ÷ YFS = {earningsParams.wle} ÷ {dateCalc.derivedYFS.toFixed(2)} = {algebraic.wlf.toFixed(4)} ({workLifeFactor.toFixed(2)}%)
-                </div>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  This factor accounts for the probability that a worker will not be continuously employed throughout the entire period to retirement, reflecting expected periods of labor-force withdrawal.
-                </p>
-              </div>
-
-              {/* Wage Growth Rate */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Wage Growth Rate</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  To project future losses, a constant nominal wage and benefit growth rate of {earningsParams.wageGrowth}% is applied to {caseInfo.plaintiff ? `${caseInfo.plaintiff}'s` : "the plaintiff's"} pre-injury base earnings and percentage-based fringe benefits. This rate incorporates both expected general price inflation and real wage growth and is anchored to long-run U.S. Bureau of Labor Statistics Employment Cost Index (ECI) data for wages, salaries, and total compensation, averaged over multiple business cycles to smooth temporary fluctuations. This provides a stable, neutral measure of expected compensation growth that reflects broad economy-wide trends rather than current conditions in any particular year (Martin & Weinstein, 2012).
-                </p>
-              </div>
-
-              {/* Unemployment Adjustment Factor */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Unemployment Adjustment Factor</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  This appraisal does not assume lifetime full-time employment. An unemployment adjustment is applied so that projected work years reflect the probability that the plaintiff will experience periods of joblessness over a typical career. Age-, sex-, and race-specific unemployment probabilities are taken from the U.S. Bureau of Labor Statistics Current Population Survey. The unemployment rate used in this analysis is {earningsParams.unemploymentRate}%.
-                </p>
-              </div>
-
-              {/* Net Unemployment Adjustment */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Net Unemployment Adjustment</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  During periods of involuntary unemployment, unemployment insurance (UI) benefits partially offset wage loss. Accordingly, the gross unemployment deduction is reduced by a UI replacement rate so that only the net, uncompensated portion of unemployment is reflected in the loss estimates. The UI replacement rate used is {earningsParams.uiReplacementRate}%. The net unemployment adjustment is calculated as:
-                </p>
-                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
-                  Net Unemp Factor = 1 − (UF × [1 − UI]) = 1 − ({(earningsParams.unemploymentRate/100).toFixed(4)} × [1 − {(earningsParams.uiReplacementRate/100).toFixed(2)}]) = {algebraic.unempFactor.toFixed(4)}
-                </div>
-              </div>
-
-              {/* Tax Adjustment Factor */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Tax Adjustment Factor</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  The tax adjustment factor reflects the fact that the "but-for" earnings stream and the lump-sum damage award are treated differently under the tax law. Under Internal Revenue Code §104(a)(2), compensatory damages for personal physical injury are generally excluded from gross income. An award that simply replaces gross wages would therefore leave the plaintiff with a higher after-tax position than if the injury had never occurred, unless the award is reduced to reflect the taxes that would have been paid.
-                </p>
-              </div>
-
-              {/* Federal Tax Rate */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Federal Tax Rate</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  The federal tax adjustment is based on an effective personal income tax rate of {earningsParams.fedTaxRate}% rather than the top marginal bracket. Effective rates are estimated using Internal Revenue Service Statistics of Income (SOI) tables and Congressional Budget Office projections, for a filing status and income pattern consistent with the claimant's projected "but-for" earnings path.
-                </p>
-              </div>
-
-              {/* State Tax Rate */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">State Tax Rate</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  State personal income taxes are modeled using an effective state tax rate of {earningsParams.stateTaxRate}%, derived from the official tax tables of {caseInfo.state || 'the applicable state'}. This effective state rate is applied to the taxable portion of projected wages and salaries throughout the loss period.
-                </p>
-              </div>
-
-              {/* Combined Tax Rate */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Combined Tax Rate</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  To correctly combine federal and state income taxes without double counting, the combined effective tax rate is calculated multiplicatively:
-                </p>
-                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
-                  Combined = 1 − (1 − FedTax) × (1 − StateTax) = 1 − (1 − {(earningsParams.fedTaxRate/100).toFixed(4)}) × (1 − {(earningsParams.stateTaxRate/100).toFixed(4)}) = {fmtPct(algebraic.combinedTaxRate)}
-                </div>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  The after-tax factor used in the AEF calculation is therefore {algebraic.afterTaxFactor.toFixed(4)}.
-                </p>
-              </div>
-
-              {/* Discount Rate */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Discount Rate</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Where the governing legal framework requires conversion of future losses to present value, this appraisal discounts the projected after-tax loss stream using a discount rate of {earningsParams.discountRate}%, consistent with <em>Jones & Laughlin Steel Corp. v. Pfeifer</em>, which directs that discounting should be based on the "best and safest" investments. Nominal discount rates are derived from constant-maturity Treasury yields for maturities that approximate the loss horizon, using U.S. Department of the Treasury and Federal Reserve data averaged over several recent years to smooth short-term volatility.
-                </p>
-              </div>
-
-              {/* Net Discount Rate */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Net Discount Rate</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  The net discount rate (NDR) captures the combined effect of the discount rate and the assumed growth rate of earnings. An exact expression is: NDR = (1 + r) / (1 + g) − 1, where r = discount rate and g = growth rate. For this appraisal:
-                </p>
-                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
-                  NDR = (1 + {(earningsParams.discountRate/100).toFixed(4)}) / (1 + {(earningsParams.wageGrowth/100).toFixed(4)}) − 1 = {(((1 + earningsParams.discountRate/100) / (1 + earningsParams.wageGrowth/100)) - 1).toFixed(4)} ({(((1 + earningsParams.discountRate/100) / (1 + earningsParams.wageGrowth/100) - 1) * 100).toFixed(2)}%)
-                </div>
-              </div>
-
-              {/* Present Value */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Present Value and Time Value of Money</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Present value is the idea that a dollar received in the future is worth less than a dollar received today, because today's dollar can be invested and can earn a return. Present-value calculations convert a stream of future losses into the single lump-sum amount that would be financially equivalent at the valuation date. Using a mid-year convention, the present value formula is:
-                </p>
-                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
-                  PV<sub>t</sub> = FV<sub>t</sub> / (1 + r)<sup>t−0.5</sup>
-                </div>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  The exponent t − 0.5 reflects the assumption that losses, on average, occur halfway through each year.
-                </p>
-              </div>
-
-              {/* AEF */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Adjusted Earnings Factor (AEF) – Algebraic Method</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  The Adjusted Earnings Factor (AEF) is an algebraic shorthand that combines several adjustments into a single multiplicative term (Tinari, 2016; Martin & Weinstein, 2012). A common form is:
-                </p>
-                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
-                  AEF = WLF × (1 − UF) × (1 − TR) × (1 + FB)
-                </div>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Where WLF = Work Life Factor, UF = Net Unemployment Factor, TR = Combined Tax Rate, and FB = Fringe Benefit Loading Rate. This transparent equation consolidates multiple adjustment steps that would otherwise require dozens of spreadsheet rows.
-                </p>
-              </div>
-
-              {/* Fringe Benefit Loading Rate */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Fringe-Benefit Loading Rate</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Employer-paid benefits are valued relative to wages through a fringe-benefit loading rate. If B = annual value of employer-paid discretionary benefits and E = annual base wages, then the fringe-benefit loading rate is FB = B / E. {isUnionMode ? `For this case using union plan values, the total annual fringe benefits of ${fmtUSD(algebraic.flatFringeAmount)} relative to base earnings of ${fmtUSD(earningsParams.baseEarnings)} yields an effective loading rate of ${earningsParams.baseEarnings > 0 ? ((algebraic.flatFringeAmount / earningsParams.baseEarnings) * 100).toFixed(2) : 0}%.` : `For this case using ECEC benchmark values, a fringe loading rate of ${earningsParams.fringeRate}% is applied.`}
-                </p>
-              </div>
-
-              {/* Household Services */}
-              {hhServices.active && (
-                <div className="mb-6">
-                  <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Household Services Valuation</h3>
-                  <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                    Household services represent the economic value of unpaid domestic work that the plaintiff can no longer perform or can only perform at reduced capacity due to the injury. The valuation is based on {hhServices.hoursPerWeek} hours per week of lost household services at a market replacement rate of ${hhServices.hourlyRate}/hour, grown at {hhServices.growthRate}% annually and discounted at {hhServices.discountRate}%. The resulting present value of lost household services is {fmtUSD(hhsData.totalPV)}.
-                  </p>
-                </div>
-              )}
-
-              {/* Mitigation */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Mitigation and Replacement Earnings</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  Under the doctrine of mitigation, an injured party has a duty to minimize damages by making reasonable efforts to obtain replacement employment. Post-injury earnings capacity of {fmtUSD(earningsParams.residualEarnings)} per year represents the earnings the plaintiff can reasonably be expected to obtain given functional limitations and labor market conditions. The difference between but-for earnings and actual/attainable post-injury earnings constitutes the compensable loss.
-                </p>
-              </div>
-
-              {/* CPI/CAGR */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Compound Annual Growth Rate (CAGR) and Consumer Price Index (CPI)</h3>
-                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                  For life care planning cost projections, future healthcare expenses are developed using a compound annual growth rate (CAGR) framework that links each service category to an appropriate medical price index and discounts the resulting nominal cost stream to present value. CPI data from the U.S. Bureau of Labor Statistics is used, with different growth rates applied based on service category (e.g., Professional Medical Services, Hospital Services, Medical Care Commodities, Transportation Services).
-                </p>
-              </div>
-
-              {/* Life Care Plan Equations */}
-              {lcpItems.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Equations Used in Life Care Plan Costing</h3>
-                  <p className="text-[10pt] text-justify text-slate-700 leading-relaxed mb-2">
-                    The life care plan cost projections follow a standard structure:
-                  </p>
-                  <ol className="list-decimal ml-6 text-[10pt] text-slate-700 space-y-1">
-                    <li><strong>Base-Year Unit Cost:</strong> C₀ = observed cost per unit in the valuation year</li>
-                    <li><strong>Price Escalation:</strong> C<sub>t</sub> = C₀ × (1 + g)<sup>t</sup>, where g = category-specific CPI growth rate</li>
-                    <li><strong>Annual Nominal Cost:</strong> AnnualCost<sub>t</sub> = C<sub>t</sub> × frequency</li>
-                    <li><strong>Present Value:</strong> PV<sub>t</sub> = AnnualCost<sub>t</sub> / (1 + r)<sup>t−0.5</sup></li>
-                    <li><strong>Total PV:</strong> PV<sub>Total</sub> = Σ PV<sub>t</sub> across all years and modalities</li>
-                  </ol>
-                </div>
-              )}
-            </section>
-
-            {/* STATEMENT OF ETHICAL PRINCIPLES */}
-            <section className="mb-8 break-inside-avoid">
-              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Statement of Ethical Principles</h2>
-              <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
-                The analysis and opinions expressed in this report are prepared in accordance with the Statement of Ethical Principles and Principles of Professional Practice of the National Association of Forensic Economics (NAFE). These principles require that forensic economists maintain objectivity, apply generally accepted methodologies, disclose assumptions and data sources, and refrain from advocacy that would compromise professional integrity.
-              </p>
-            </section>
-
-            {/* EXPORT BUTTONS */}
-            <ExportButtons 
-              reportRef={reportRef}
-              caseInfo={caseInfo}
-              dateCalc={dateCalc}
-              earningsParams={earningsParams}
-              algebraic={algebraic}
-              projection={projection}
-              hhServices={hhServices}
-              hhsData={hhsData}
-              lcpItems={lcpItems}
-              lcpData={lcpData}
-              isUnionMode={isUnionMode}
-              grandTotal={grandTotal}
-              workLifeFactor={workLifeFactor}
-              fmtUSD={fmtUSD}
-              fmtPct={fmtPct}
-            />
-          </div>
-        )}
-
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-8 print:p-0">
+        {renderStep()}
       </main>
     </div>
   );
