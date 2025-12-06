@@ -1,9 +1,27 @@
-import React from 'react';
-import { Table, Copy, Check, Target, BarChart3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Table, Copy, Check, Target, BarChart3, Palette, Settings2 } from 'lucide-react';
 import { Card } from '../ui';
 import { Projection, HhServices, HhsData, LcpData, Algebraic, ScenarioProjection } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { Checkbox } from '../../../components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '../../../components/ui/popover';
+
+interface ChartStyle {
+  activeColor: string;
+  includedColor: string;
+  excludedColor: string;
+  showLabels: boolean;
+  barRadius: number;
+}
+
+const CHART_PRESETS: { name: string; style: ChartStyle }[] = [
+  { name: 'Default', style: { activeColor: '#3b82f6', includedColor: '#10b981', excludedColor: '#6b7280', showLabels: true, barRadius: 4 } },
+  { name: 'Ocean', style: { activeColor: '#0ea5e9', includedColor: '#06b6d4', excludedColor: '#94a3b8', showLabels: true, barRadius: 6 } },
+  { name: 'Sunset', style: { activeColor: '#f97316', includedColor: '#eab308', excludedColor: '#a3a3a3', showLabels: true, barRadius: 4 } },
+  { name: 'Forest', style: { activeColor: '#22c55e', includedColor: '#84cc16', excludedColor: '#78716c', showLabels: true, barRadius: 8 } },
+  { name: 'Royal', style: { activeColor: '#8b5cf6', includedColor: '#a855f7', excludedColor: '#71717a', showLabels: true, barRadius: 2 } },
+  { name: 'Monochrome', style: { activeColor: '#18181b', includedColor: '#52525b', excludedColor: '#d4d4d8', showLabels: false, barRadius: 0 } },
+];
 
 interface SummaryStepProps {
   projection: Projection;
@@ -34,6 +52,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   fmtUSD,
   fmtPct
 }) => {
+  const [chartStyle, setChartStyle] = useState<ChartStyle>(CHART_PRESETS[0].style);
   const [copySuccess, setCopySuccess] = React.useState('');
 
   const copyTable = () => {
@@ -197,9 +216,104 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
 
           {/* Bar Chart Visualization */}
           <Card className="p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="w-4 h-4 text-emerald-500" />
-              <h3 className="text-sm font-bold uppercase text-muted-foreground">Grand Total by Retirement Scenario</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-500" />
+                <h3 className="text-sm font-bold uppercase text-muted-foreground">Grand Total by Retirement Scenario</h3>
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded-lg transition-colors">
+                    <Palette className="w-3.5 h-3.5" />
+                    <span>Customize</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72" align="end">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Settings2 className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-bold text-sm">Chart Style</span>
+                    </div>
+                    
+                    {/* Presets */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground font-medium">Presets</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {CHART_PRESETS.map(preset => (
+                          <button
+                            key={preset.name}
+                            onClick={() => setChartStyle(preset.style)}
+                            className={`px-2 py-1.5 text-xs rounded border transition-colors ${
+                              JSON.stringify(chartStyle) === JSON.stringify(preset.style) 
+                                ? 'border-primary bg-primary/10 text-primary' 
+                                : 'border-border hover:bg-muted'
+                            }`}
+                          >
+                            {preset.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Colors */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground font-medium">Colors</label>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Active Scenario</span>
+                          <input
+                            type="color"
+                            value={chartStyle.activeColor}
+                            onChange={(e) => setChartStyle(prev => ({ ...prev, activeColor: e.target.value }))}
+                            className="w-8 h-6 rounded cursor-pointer border border-border"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Included</span>
+                          <input
+                            type="color"
+                            value={chartStyle.includedColor}
+                            onChange={(e) => setChartStyle(prev => ({ ...prev, includedColor: e.target.value }))}
+                            className="w-8 h-6 rounded cursor-pointer border border-border"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs">Excluded</span>
+                          <input
+                            type="color"
+                            value={chartStyle.excludedColor}
+                            onChange={(e) => setChartStyle(prev => ({ ...prev, excludedColor: e.target.value }))}
+                            className="w-8 h-6 rounded cursor-pointer border border-border"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Options */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground font-medium">Options</label>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Show Labels</span>
+                        <Checkbox
+                          checked={chartStyle.showLabels}
+                          onCheckedChange={(checked) => setChartStyle(prev => ({ ...prev, showLabels: !!checked }))}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Bar Radius</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="12"
+                          value={chartStyle.barRadius}
+                          onChange={(e) => setChartStyle(prev => ({ ...prev, barRadius: parseInt(e.target.value) }))}
+                          className="w-20"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -228,35 +342,37 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                     contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                     labelStyle={{ fontWeight: 'bold' }}
                   />
-                  <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="total" radius={[chartStyle.barRadius, chartStyle.barRadius, 0, 0]}>
                     {scenarioProjections.map((s, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={s.id === selectedScenario ? 'hsl(var(--primary))' : s.included ? '#10b981' : 'hsl(var(--muted-foreground))'}
+                        fill={s.id === selectedScenario ? chartStyle.activeColor : s.included ? chartStyle.includedColor : chartStyle.excludedColor}
                         opacity={s.included ? 1 : 0.4}
                       />
                     ))}
-                    <LabelList 
-                      dataKey="total" 
-                      position="top" 
-                      formatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
-                      style={{ fontSize: 10, fill: 'hsl(var(--foreground))' }}
-                    />
+                    {chartStyle.showLabels && (
+                      <LabelList 
+                        dataKey="total" 
+                        position="top" 
+                        formatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
+                        style={{ fontSize: 10, fill: 'hsl(var(--foreground))' }}
+                      />
+                    )}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div className="flex items-center justify-center gap-6 mt-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-primary"></div>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: chartStyle.activeColor }}></div>
                 <span>Active Scenario</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: chartStyle.includedColor }}></div>
                 <span>Included in Report</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-muted-foreground opacity-40"></div>
+                <div className="w-3 h-3 rounded opacity-40" style={{ backgroundColor: chartStyle.excludedColor }}></div>
                 <span>Not Included</span>
               </div>
             </div>
