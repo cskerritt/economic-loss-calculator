@@ -100,8 +100,8 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
         },
         hhServices: { ...DEFAULT_HH_SERVICES, active: true, hoursPerWeek: 8, hourlyRate: 28 },
         lcpItems: [
-          { id: 1, categoryId: 'therapy', name: 'Physical Therapy (ongoing)', baseCost: 4800, freqType: 'annual', duration: 20, startYear: 0, cpi: 1.62, recurrenceInterval: 1 },
-          { id: 2, categoryId: 'rx', name: 'Pain Management Medications', baseCost: 2400, freqType: 'annual', duration: 38, startYear: 0, cpi: 1.65, recurrenceInterval: 1 },
+          { id: 1, categoryId: 'therapy', name: 'Physical Therapy (ongoing)', baseCost: 4800, freqType: 'annual', duration: 20, startYear: 1, endYear: 20, cpi: 1.62, recurrenceInterval: 1, useCustomYears: false, customYears: [] },
+          { id: 2, categoryId: 'rx', name: 'Pain Management Medications', baseCost: 2400, freqType: 'annual', duration: 38, startYear: 1, endYear: 38, cpi: 1.65, recurrenceInterval: 1, useCustomYears: false, customYears: [] },
         ],
         pastActuals: {},
         isUnionMode: false
@@ -135,8 +135,8 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
         },
         hhServices: { ...DEFAULT_HH_SERVICES, active: true, hoursPerWeek: 15, hourlyRate: 30 },
         lcpItems: [
-          { id: 1, categoryId: 'evals', name: 'Neurological Follow-up', baseCost: 3500, freqType: 'annual', duration: 28, startYear: 0, cpi: 2.88, recurrenceInterval: 1 },
-          { id: 2, categoryId: 'therapy', name: 'Cognitive Rehabilitation', baseCost: 12000, freqType: 'annual', duration: 5, startYear: 0, cpi: 1.62, recurrenceInterval: 1 },
+          { id: 1, categoryId: 'evals', name: 'Neurological Follow-up', baseCost: 3500, freqType: 'annual', duration: 28, startYear: 1, endYear: 28, cpi: 2.88, recurrenceInterval: 1, useCustomYears: false, customYears: [] },
+          { id: 2, categoryId: 'therapy', name: 'Cognitive Rehabilitation', baseCost: 12000, freqType: 'annual', duration: 5, startYear: 1, endYear: 5, cpi: 1.62, recurrenceInterval: 1, useCustomYears: false, customYears: [] },
         ],
         pastActuals: {},
         isUnionMode: true
@@ -171,8 +171,8 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
         },
         hhServices: DEFAULT_HH_SERVICES,
         lcpItems: [
-          { id: 1, categoryId: 'surgery', name: 'Future Reconstructive Surgery', baseCost: 45000, freqType: 'onetime', duration: 1, startYear: 3, cpi: 4.07, recurrenceInterval: 0 },
-          { id: 2, categoryId: 'therapy', name: 'Occupational Therapy', baseCost: 6000, freqType: 'annual', duration: 10, startYear: 0, cpi: 1.62, recurrenceInterval: 1 },
+          { id: 1, categoryId: 'surgery', name: 'Future Reconstructive Surgery', baseCost: 45000, freqType: 'onetime', duration: 1, startYear: 3, endYear: 3, cpi: 4.07, recurrenceInterval: 1, useCustomYears: false, customYears: [] },
+          { id: 2, categoryId: 'therapy', name: 'Occupational Therapy', baseCost: 6000, freqType: 'annual', duration: 10, startYear: 1, endYear: 10, cpi: 1.62, recurrenceInterval: 1, useCustomYears: false, customYears: [] },
         ],
         pastActuals: {},
         isUnionMode: true

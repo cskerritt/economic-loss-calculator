@@ -77,8 +77,11 @@ export interface LcpItem {
   freqType: string;
   duration: number;
   startYear: number;
+  endYear: number;
   cpi: number;
   recurrenceInterval: number;
+  useCustomYears: boolean;
+  customYears: number[];
 }
 
 export interface DateCalc {

@@ -19,16 +19,21 @@ export const LCPStep: React.FC<LCPStepProps> = ({
   fmtUSD 
 }) => {
   const addItem = () => {
+    const defaultDuration = Math.max(1, Math.ceil(lifeExpectancy || 25));
+    const startYear = 1;
     setLcpItems([...lcpItems, {
       id: Date.now(),
       categoryId: 'evals',
       name: 'New Item',
       baseCost: 0,
       freqType: 'annual',
-      duration: Math.ceil(lifeExpectancy || 25),
-      startYear: 1,
+      duration: defaultDuration,
+      startYear,
+      endYear: startYear + defaultDuration - 1,
       cpi: 2.88,
-      recurrenceInterval: 1
+      recurrenceInterval: 1,
+      useCustomYears: false,
+      customYears: []
     }]);
   };
 
@@ -67,6 +72,11 @@ export const LCPStep: React.FC<LCPStepProps> = ({
             <div className="space-y-3">
               {lcpItems.map(item => {
                 const itemData = lcpData.items.find(i => i.id === item.id);
+                const startYear = Math.max(1, item.startYear || 1);
+                const endYear = Math.max(startYear, item.endYear || startYear + item.duration - 1);
+                const duration = Math.max(1, endYear - startYear + 1);
+                const yearRange = Array.from({ length: Math.min(200, duration) }, (_, idx) => startYear + idx);
+                const updateItem = (changes: Partial<LcpItem>) => setLcpItems(lcpItems.map(i => i.id === item.id ? { ...i, ...changes } : i));
                 return (
                   <div key={item.id} className="relative bg-card border border-border p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
@@ -77,7 +87,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                           value={item.categoryId} 
                           onChange={(e) => {
                             const cat = CPI_CATEGORIES.find(c => c.id === e.target.value);
-                            setLcpItems(lcpItems.map(i => i.id === item.id ? {...i, categoryId: e.target.value, cpi: cat ? cat.rate : 0} : i));
+                            updateItem({ categoryId: e.target.value, cpi: cat ? cat.rate : item.cpi });
                           }}
                         >
                           {CPI_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -88,7 +98,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                         <input 
                           className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground" 
                           value={item.name} 
-                          onChange={e => setLcpItems(lcpItems.map(i => i.id === item.id ? {...i, name: e.target.value} : i))}
+                          onChange={e => updateItem({ name: e.target.value })}
                         />
                       </div>
                       <div className="md:col-span-1">
@@ -97,7 +107,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                           type="number" 
                           className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground" 
                           value={item.baseCost} 
-                          onChange={e => setLcpItems(lcpItems.map(i => i.id === item.id ? {...i, baseCost: parseFloat(e.target.value) || 0} : i))}
+                          onChange={e => updateItem({ baseCost: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -105,7 +115,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                         <select 
                           className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground" 
                           value={item.freqType} 
-                          onChange={e => setLcpItems(lcpItems.map(i => i.id === item.id ? {...i, freqType: e.target.value} : i))}
+                          onChange={e => updateItem({ freqType: e.target.value })}
                         >
                           <option value="annual">Annual</option>
                           <option value="onetime">One Time</option>
@@ -113,21 +123,49 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                         </select>
                       </div>
                       <div className="md:col-span-1">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Every X Yrs</label>
+                        <input
+                          type="number"
+                          className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground"
+                          value={item.recurrenceInterval}
+                          onChange={e => updateItem({ recurrenceInterval: Math.max(1, parseInt(e.target.value) || 1) })}
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Start Year</label>
+                        <input
+                          type="number"
+                          className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground"
+                          value={startYear}
+                          onChange={e => {
+                            const nextStart = Math.max(1, parseInt(e.target.value) || 1);
+                            const nextEnd = Math.max(nextStart, endYear);
+                            updateItem({ startYear: nextStart, endYear: nextEnd, duration: Math.max(1, nextEnd - nextStart + 1) });
+                          }}
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="text-[9px] font-bold uppercase text-muted-foreground">End Year</label>
+                        <input
+                          type="number"
+                          className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground"
+                          value={endYear}
+                          onChange={e => {
+                            const nextEnd = Math.max(startYear, parseInt(e.target.value) || startYear);
+                            updateItem({ endYear: nextEnd, duration: Math.max(1, nextEnd - startYear + 1) });
+                          }}
+                        />
+                      </div>
+                      <div className="md:col-span-1">
                         <label className="text-[9px] font-bold uppercase text-muted-foreground">Duration</label>
                         <input 
                           type="number" 
                           className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground" 
                           value={item.duration} 
-                          onChange={e => setLcpItems(lcpItems.map(i => i.id === item.id ? {...i, duration: parseInt(e.target.value) || 1} : i))}
-                        />
-                      </div>
-                      <div className="md:col-span-1">
-                        <label className="text-[9px] font-bold uppercase text-muted-foreground">Start Yr</label>
-                        <input 
-                          type="number" 
-                          className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground" 
-                          value={item.startYear} 
-                          onChange={e => setLcpItems(lcpItems.map(i => i.id === item.id ? {...i, startYear: parseInt(e.target.value) || 1} : i))}
+                          onChange={e => {
+                            const nextDuration = Math.max(1, parseInt(e.target.value) || 1);
+                            updateItem({ duration: nextDuration, endYear: startYear + nextDuration - 1 });
+                          }}
                         />
                       </div>
                       <div className="md:col-span-1">
@@ -137,7 +175,7 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                           step="0.01" 
                           className="w-full text-sm font-medium bg-muted rounded-lg border-none py-2 px-2 text-foreground" 
                           value={item.cpi} 
-                          onChange={e => setLcpItems(lcpItems.map(i => i.id === item.id ? {...i, cpi: parseFloat(e.target.value) || 0} : i))}
+                          onChange={e => updateItem({ cpi: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
                       <div className="md:col-span-1 flex items-center justify-end gap-2">
@@ -151,6 +189,73 @@ export const LCPStep: React.FC<LCPStepProps> = ({
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                      </div>
+                      <div className="md:col-span-12 bg-muted rounded-lg p-3 border border-border">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={item.useCustomYears}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                updateItem({ useCustomYears: checked, customYears: checked ? yearRange : item.customYears });
+                              }}
+                            />
+                            <span className="text-sm font-medium">Use manual year selection</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Range: Years {startYear}–{endYear} ({duration} total)
+                          </div>
+                        </div>
+
+                        {item.useCustomYears && (
+                          <div className="mt-3 space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => updateItem({ customYears: yearRange })}
+                                className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-background"
+                              >
+                                Select all in range
+                              </button>
+                              <button
+                                onClick={() => updateItem({ customYears: [] })}
+                                className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-background"
+                              >
+                                Clear selection
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const every = Math.max(1, item.recurrenceInterval || 1);
+                                  const pattern = yearRange.filter((_, idx) => idx % every === 0);
+                                  updateItem({ customYears: pattern });
+                                }}
+                                className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-background"
+                              >
+                                Fill every {Math.max(1, item.recurrenceInterval || 1)} year(s)
+                              </button>
+                            </div>
+                            <div className="max-h-40 overflow-y-auto grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 text-xs">
+                              {yearRange.map((year) => {
+                                const checked = item.customYears.includes(year);
+                                return (
+                                  <label key={year} className="flex items-center gap-2 bg-background border border-border rounded-md px-2 py-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => {
+                                        const next = checked
+                                          ? item.customYears.filter((y) => y !== year)
+                                          : [...item.customYears, year].sort((a, b) => a - b);
+                                        updateItem({ customYears: next });
+                                      }}
+                                    />
+                                    <span>Year {year}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
