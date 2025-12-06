@@ -193,17 +193,35 @@ export function computeLcpData(lcpItems: LcpItem[], discountRate: number): LcpDa
     let itemNominal = 0;
     let itemPV = 0;
 
-    for (let t = 0; t < item.duration; t++) {
-      let active = false;
-      if (item.freqType === "annual") active = true;
-      else if (item.freqType === "onetime") active = t === 0;
-      else if (item.freqType === "recurring") active = t % item.recurrenceInterval === 0;
+    const baseStartYear = Math.max(1, item.startYear || 1);
+    const endYear = Math.max(item.endYear || 0, baseStartYear + item.duration - 1);
+    const duration = Math.max(0, endYear - baseStartYear + 1);
+    const useCustom = item.useCustomYears && item.customYears && item.customYears.length > 0;
 
-      if (active) {
-        const inflated = item.baseCost * Math.pow(1 + item.cpi / 100, t + item.startYear - 1);
-        const discount = 1 / Math.pow(1 + discountRate / 100, t + item.startYear - 0.5);
+    if (useCustom) {
+      const years = Array.from(new Set(item.customYears.filter((y) => y > 0))).sort((a, b) => a - b);
+      for (const year of years) {
+        const t = year - 1;
+        const inflated = item.baseCost * Math.pow(1 + item.cpi / 100, t);
+        const discount = 1 / Math.pow(1 + discountRate / 100, t + 0.5);
         itemNominal += inflated;
         itemPV += inflated * discount;
+      }
+    } else {
+      const interval = Math.max(1, item.recurrenceInterval || 1);
+      for (let t = 0; t < duration; t++) {
+        let active = false;
+        if (item.freqType === "annual") active = true;
+        else if (item.freqType === "onetime") active = t === 0;
+        else if (item.freqType === "recurring") active = t % interval === 0;
+
+        if (active) {
+          const absoluteYearIndex = baseStartYear - 1 + t;
+          const inflated = item.baseCost * Math.pow(1 + item.cpi / 100, absoluteYearIndex);
+          const discount = 1 / Math.pow(1 + discountRate / 100, absoluteYearIndex + 0.5);
+          itemNominal += inflated;
+          itemPV += inflated * discount;
+        }
       }
     }
 

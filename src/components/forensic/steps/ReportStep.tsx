@@ -270,15 +270,22 @@ export const ReportStep: React.FC<ReportStepProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {lcpData.items.map(item => (
-                  <tr key={item.id}>
-                    <td className="p-2 border border-slate-300">{item.name}</td>
-                    <td className="p-2 border border-slate-300">{item.categoryId}</td>
-                    <td className="p-2 border border-slate-300 text-right">{fmtUSD(item.baseCost)}</td>
-                    <td className="p-2 border border-slate-300 text-right">{item.duration} yrs</td>
-                    <td className="p-2 border border-slate-300 text-right font-bold">{fmtUSD(item.totalPV)}</td>
-                  </tr>
-                ))}
+                {lcpData.items.map(item => {
+                  const endYear = item.endYear ?? item.startYear + item.duration - 1;
+                  const duration = Math.max(1, endYear - item.startYear + 1);
+                  const durationLabel = item.useCustomYears
+                    ? `${item.customYears.length} selected`
+                    : `${duration} yrs`;
+                  return (
+                    <tr key={item.id}>
+                      <td className="p-2 border border-slate-300">{item.name}</td>
+                      <td className="p-2 border border-slate-300">{item.categoryId}</td>
+                      <td className="p-2 border border-slate-300 text-right">{fmtUSD(item.baseCost)}</td>
+                      <td className="p-2 border border-slate-300 text-right">{durationLabel}</td>
+                      <td className="p-2 border border-slate-300 text-right font-bold">{fmtUSD(item.totalPV)}</td>
+                    </tr>
+                  );
+                })}
                 <tr className="bg-slate-100 font-bold">
                   <td colSpan={4} className="p-2 border border-slate-300 text-right">TOTAL</td>
                   <td className="p-2 border border-slate-300 text-right">{fmtUSD(lcpData.totalPV)}</td>

@@ -45,6 +45,23 @@ export default function ForensicSuite() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingWord, setIsExportingWord] = useState(false);
 
+  const normalizeLcpItems = useCallback((items: LcpItem[] = []): LcpItem[] => {
+    return items.map((item) => {
+      const startYear = Math.max(1, item.startYear || 1);
+      const duration = Math.max(1, item.duration || 1);
+      const endYear = Math.max(startYear, item.endYear ?? startYear + duration - 1);
+      return {
+        ...item,
+        startYear,
+        duration,
+        endYear,
+        recurrenceInterval: Math.max(1, item.recurrenceInterval || 1),
+        useCustomYears: item.useCustomYears ?? false,
+        customYears: item.customYears ?? [],
+      };
+    });
+  }, []);
+
   // Persistent State with error handling for corrupted localStorage
   const [caseInfo, setCaseInfo] = useState<CaseInfo>(() => {
     try {
@@ -85,7 +102,8 @@ export default function ForensicSuite() {
   const [lcpItems, setLcpItems] = useState<LcpItem[]>(() => {
     try {
       const saved = localStorage.getItem('fs_lcp_v10');
-      return saved ? JSON.parse(saved) : [];
+      const parsed = saved ? JSON.parse(saved) : [];
+      return normalizeLcpItems(parsed);
     } catch {
       return [];
     }
@@ -130,7 +148,7 @@ export default function ForensicSuite() {
     setCaseInfo(savedCase.caseInfo);
     setEarningsParams(savedCase.earningsParams);
     setHhServices(savedCase.hhServices);
-    setLcpItems(savedCase.lcpItems);
+    setLcpItems(normalizeLcpItems(savedCase.lcpItems));
     setPastActuals(savedCase.pastActuals);
     setIsUnionMode(savedCase.isUnionMode);
     setCurrentStep(0);
@@ -141,7 +159,7 @@ export default function ForensicSuite() {
     setCaseInfo(defaults.caseInfo);
     setEarningsParams(defaults.earningsParams);
     setHhServices(defaults.hhServices);
-    setLcpItems(defaults.lcpItems);
+    setLcpItems(normalizeLcpItems(defaults.lcpItems));
     setPastActuals(defaults.pastActuals);
     setIsUnionMode(defaults.isUnionMode);
     setCurrentStep(0);
