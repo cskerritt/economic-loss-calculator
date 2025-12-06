@@ -1153,6 +1153,221 @@ export default function ForensicSuite() {
               </section>
             )}
 
+            {/* ==================== APPENDIX - TERMINOLOGY ==================== */}
+            <div className="break-before-page" />
+            <section className="mb-8">
+              <h2 className="text-lg font-bold font-serif uppercase border-b-2 border-slate-900 pb-2 mb-6 text-center">APPENDIX – TERMINOLOGY AND METHODOLOGY</h2>
+              
+              {/* Life Expectancy */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Life Expectancy</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Life expectancy is the average number of years remaining for a person of a given age, sex, and demographic profile, based on actuarial mortality tables. For this appraisal, life expectancy is drawn from {caseInfo.lifeTableSource || 'the most recent United States life tables published by the National Center for Health Statistics'}. The remaining life expectancy of {caseInfo.lifeExpectancy || '[X.XX]'} years is used as the planning horizon for life care plan items that extend through the end of life.
+                </p>
+              </div>
+
+              {/* Work Life Expectancy */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Work Life Expectancy</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Work life expectancy (WLE) is the expected number of years a person will remain in the labor force, accounting for periods of employment, unemployment, and labor-force withdrawal. WLE differs from life expectancy because not all remaining years of life are spent working. For this appraisal, WLE of {earningsParams.wle} years is based on {caseInfo.wleSource || 'authoritative work life expectancy tables'}, adjusted as appropriate for {caseInfo.plaintiff ? `${caseInfo.plaintiff}'s` : "the plaintiff's"} age, sex, education, and employment pattern.
+                </p>
+              </div>
+
+              {/* Years to Final Separation */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Years to Final Separation</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Years to Final Separation (YFS) is the number of years from the valuation date to the assumed retirement or final separation from the labor force. For this appraisal, YFS is calculated as {dateCalc.derivedYFS.toFixed(2)} years, representing the time from the valuation date of {caseInfo.dateOfTrial ? new Date(caseInfo.dateOfTrial).toLocaleDateString() : '[Valuation Date]'} until the assumed retirement age of {caseInfo.retirementAge}.
+                </p>
+              </div>
+
+              {/* Work Life Factor */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Work Life Factor</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  The Work Life Factor (WLF) represents the ratio of expected work life to years from the valuation date to assumed retirement or final separation. It is calculated as:
+                </p>
+                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
+                  WLF = WLE ÷ YFS = {earningsParams.wle} ÷ {dateCalc.derivedYFS.toFixed(2)} = {algebraic.wlf.toFixed(4)} ({workLifeFactor.toFixed(2)}%)
+                </div>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  This factor accounts for the probability that a worker will not be continuously employed throughout the entire period to retirement, reflecting expected periods of labor-force withdrawal.
+                </p>
+              </div>
+
+              {/* Wage Growth Rate */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Wage Growth Rate</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  To project future losses, a constant nominal wage and benefit growth rate of {earningsParams.wageGrowth}% is applied to {caseInfo.plaintiff ? `${caseInfo.plaintiff}'s` : "the plaintiff's"} pre-injury base earnings and percentage-based fringe benefits. This rate incorporates both expected general price inflation and real wage growth and is anchored to long-run U.S. Bureau of Labor Statistics Employment Cost Index (ECI) data for wages, salaries, and total compensation, averaged over multiple business cycles to smooth temporary fluctuations. This provides a stable, neutral measure of expected compensation growth that reflects broad economy-wide trends rather than current conditions in any particular year (Martin & Weinstein, 2012).
+                </p>
+              </div>
+
+              {/* Unemployment Adjustment Factor */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Unemployment Adjustment Factor</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  This appraisal does not assume lifetime full-time employment. An unemployment adjustment is applied so that projected work years reflect the probability that the plaintiff will experience periods of joblessness over a typical career. Age-, sex-, and race-specific unemployment probabilities are taken from the U.S. Bureau of Labor Statistics Current Population Survey. The unemployment rate used in this analysis is {earningsParams.unemploymentRate}%.
+                </p>
+              </div>
+
+              {/* Net Unemployment Adjustment */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Net Unemployment Adjustment</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  During periods of involuntary unemployment, unemployment insurance (UI) benefits partially offset wage loss. Accordingly, the gross unemployment deduction is reduced by a UI replacement rate so that only the net, uncompensated portion of unemployment is reflected in the loss estimates. The UI replacement rate used is {earningsParams.uiReplacementRate}%. The net unemployment adjustment is calculated as:
+                </p>
+                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
+                  Net Unemp Factor = 1 − (UF × [1 − UI]) = 1 − ({(earningsParams.unemploymentRate/100).toFixed(4)} × [1 − {(earningsParams.uiReplacementRate/100).toFixed(2)}]) = {algebraic.unempFactor.toFixed(4)}
+                </div>
+              </div>
+
+              {/* Tax Adjustment Factor */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Tax Adjustment Factor</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  The tax adjustment factor reflects the fact that the "but-for" earnings stream and the lump-sum damage award are treated differently under the tax law. Under Internal Revenue Code §104(a)(2), compensatory damages for personal physical injury are generally excluded from gross income. An award that simply replaces gross wages would therefore leave the plaintiff with a higher after-tax position than if the injury had never occurred, unless the award is reduced to reflect the taxes that would have been paid.
+                </p>
+              </div>
+
+              {/* Federal Tax Rate */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Federal Tax Rate</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  The federal tax adjustment is based on an effective personal income tax rate of {earningsParams.fedTaxRate}% rather than the top marginal bracket. Effective rates are estimated using Internal Revenue Service Statistics of Income (SOI) tables and Congressional Budget Office projections, for a filing status and income pattern consistent with the claimant's projected "but-for" earnings path.
+                </p>
+              </div>
+
+              {/* State Tax Rate */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">State Tax Rate</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  State personal income taxes are modeled using an effective state tax rate of {earningsParams.stateTaxRate}%, derived from the official tax tables of {caseInfo.state || 'the applicable state'}. This effective state rate is applied to the taxable portion of projected wages and salaries throughout the loss period.
+                </p>
+              </div>
+
+              {/* Combined Tax Rate */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Combined Tax Rate</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  To correctly combine federal and state income taxes without double counting, the combined effective tax rate is calculated multiplicatively:
+                </p>
+                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
+                  Combined = 1 − (1 − FedTax) × (1 − StateTax) = 1 − (1 − {(earningsParams.fedTaxRate/100).toFixed(4)}) × (1 − {(earningsParams.stateTaxRate/100).toFixed(4)}) = {fmtPct(algebraic.combinedTaxRate)}
+                </div>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  The after-tax factor used in the AEF calculation is therefore {algebraic.afterTaxFactor.toFixed(4)}.
+                </p>
+              </div>
+
+              {/* Discount Rate */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Discount Rate</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Where the governing legal framework requires conversion of future losses to present value, this appraisal discounts the projected after-tax loss stream using a discount rate of {earningsParams.discountRate}%, consistent with <em>Jones & Laughlin Steel Corp. v. Pfeifer</em>, which directs that discounting should be based on the "best and safest" investments. Nominal discount rates are derived from constant-maturity Treasury yields for maturities that approximate the loss horizon, using U.S. Department of the Treasury and Federal Reserve data averaged over several recent years to smooth short-term volatility.
+                </p>
+              </div>
+
+              {/* Net Discount Rate */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Net Discount Rate</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  The net discount rate (NDR) captures the combined effect of the discount rate and the assumed growth rate of earnings. An exact expression is: NDR = (1 + r) / (1 + g) − 1, where r = discount rate and g = growth rate. For this appraisal:
+                </p>
+                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
+                  NDR = (1 + {(earningsParams.discountRate/100).toFixed(4)}) / (1 + {(earningsParams.wageGrowth/100).toFixed(4)}) − 1 = {(((1 + earningsParams.discountRate/100) / (1 + earningsParams.wageGrowth/100)) - 1).toFixed(4)} ({(((1 + earningsParams.discountRate/100) / (1 + earningsParams.wageGrowth/100) - 1) * 100).toFixed(2)}%)
+                </div>
+              </div>
+
+              {/* Present Value */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Present Value and Time Value of Money</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Present value is the idea that a dollar received in the future is worth less than a dollar received today, because today's dollar can be invested and can earn a return. Present-value calculations convert a stream of future losses into the single lump-sum amount that would be financially equivalent at the valuation date. Using a mid-year convention, the present value formula is:
+                </p>
+                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
+                  PV<sub>t</sub> = FV<sub>t</sub> / (1 + r)<sup>t−0.5</sup>
+                </div>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  The exponent t − 0.5 reflects the assumption that losses, on average, occur halfway through each year.
+                </p>
+              </div>
+
+              {/* AEF */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Adjusted Earnings Factor (AEF) – Algebraic Method</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  The Adjusted Earnings Factor (AEF) is an algebraic shorthand that combines several adjustments into a single multiplicative term (Tinari, 2016; Martin & Weinstein, 2012). A common form is:
+                </p>
+                <div className="bg-slate-50 p-3 my-2 text-center font-mono text-[10pt] border border-slate-200 rounded">
+                  AEF = WLF × (1 − UF) × (1 − TR) × (1 + FB)
+                </div>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Where WLF = Work Life Factor, UF = Net Unemployment Factor, TR = Combined Tax Rate, and FB = Fringe Benefit Loading Rate. This transparent equation consolidates multiple adjustment steps that would otherwise require dozens of spreadsheet rows.
+                </p>
+              </div>
+
+              {/* Fringe Benefit Loading Rate */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Fringe-Benefit Loading Rate</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Employer-paid benefits are valued relative to wages through a fringe-benefit loading rate. If B = annual value of employer-paid discretionary benefits and E = annual base wages, then the fringe-benefit loading rate is FB = B / E. {isUnionMode ? `For this case using union plan values, the total annual fringe benefits of ${fmtUSD(algebraic.flatFringeAmount)} relative to base earnings of ${fmtUSD(earningsParams.baseEarnings)} yields an effective loading rate of ${earningsParams.baseEarnings > 0 ? ((algebraic.flatFringeAmount / earningsParams.baseEarnings) * 100).toFixed(2) : 0}%.` : `For this case using ECEC benchmark values, a fringe loading rate of ${earningsParams.fringeRate}% is applied.`}
+                </p>
+              </div>
+
+              {/* Household Services */}
+              {hhServices.active && (
+                <div className="mb-6">
+                  <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Household Services Valuation</h3>
+                  <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                    Household services represent the economic value of unpaid domestic work that the plaintiff can no longer perform or can only perform at reduced capacity due to the injury. The valuation is based on {hhServices.hoursPerWeek} hours per week of lost household services at a market replacement rate of ${hhServices.hourlyRate}/hour, grown at {hhServices.growthRate}% annually and discounted at {hhServices.discountRate}%. The resulting present value of lost household services is {fmtUSD(hhsData.totalPV)}.
+                  </p>
+                </div>
+              )}
+
+              {/* Mitigation */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Mitigation and Replacement Earnings</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  Under the doctrine of mitigation, an injured party has a duty to minimize damages by making reasonable efforts to obtain replacement employment. Post-injury earnings capacity of {fmtUSD(earningsParams.residualEarnings)} per year represents the earnings the plaintiff can reasonably be expected to obtain given functional limitations and labor market conditions. The difference between but-for earnings and actual/attainable post-injury earnings constitutes the compensable loss.
+                </p>
+              </div>
+
+              {/* CPI/CAGR */}
+              <div className="mb-6">
+                <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Compound Annual Growth Rate (CAGR) and Consumer Price Index (CPI)</h3>
+                <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                  For life care planning cost projections, future healthcare expenses are developed using a compound annual growth rate (CAGR) framework that links each service category to an appropriate medical price index and discounts the resulting nominal cost stream to present value. CPI data from the U.S. Bureau of Labor Statistics is used, with different growth rates applied based on service category (e.g., Professional Medical Services, Hospital Services, Medical Care Commodities, Transportation Services).
+                </p>
+              </div>
+
+              {/* Life Care Plan Equations */}
+              {lcpItems.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="font-bold text-slate-800 mb-2 text-[11pt]">Equations Used in Life Care Plan Costing</h3>
+                  <p className="text-[10pt] text-justify text-slate-700 leading-relaxed mb-2">
+                    The life care plan cost projections follow a standard structure:
+                  </p>
+                  <ol className="list-decimal ml-6 text-[10pt] text-slate-700 space-y-1">
+                    <li><strong>Base-Year Unit Cost:</strong> C₀ = observed cost per unit in the valuation year</li>
+                    <li><strong>Price Escalation:</strong> C<sub>t</sub> = C₀ × (1 + g)<sup>t</sup>, where g = category-specific CPI growth rate</li>
+                    <li><strong>Annual Nominal Cost:</strong> AnnualCost<sub>t</sub> = C<sub>t</sub> × frequency</li>
+                    <li><strong>Present Value:</strong> PV<sub>t</sub> = AnnualCost<sub>t</sub> / (1 + r)<sup>t−0.5</sup></li>
+                    <li><strong>Total PV:</strong> PV<sub>Total</sub> = Σ PV<sub>t</sub> across all years and modalities</li>
+                  </ol>
+                </div>
+              )}
+            </section>
+
+            {/* STATEMENT OF ETHICAL PRINCIPLES */}
+            <section className="mb-8 break-inside-avoid">
+              <h2 className="text-base font-bold font-serif uppercase border-b border-slate-300 pb-1 mb-3">Statement of Ethical Principles</h2>
+              <p className="text-[10pt] text-justify text-slate-700 leading-relaxed">
+                The analysis and opinions expressed in this report are prepared in accordance with the Statement of Ethical Principles and Principles of Professional Practice of the National Association of Forensic Economics (NAFE). These principles require that forensic economists maintain objectivity, apply generally accepted methodologies, disclose assumptions and data sources, and refrain from advocacy that would compromise professional integrity.
+              </p>
+            </section>
+
             {/* PRINT BUTTON */}
             <div className="text-center print:hidden mt-12">
               <button onClick={() => window.print()} className="bg-slate-900 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2 mx-auto transform transition-all active:scale-95">
