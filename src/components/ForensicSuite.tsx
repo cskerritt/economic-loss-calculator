@@ -11,8 +11,19 @@ import { WizardNavigation, WizardStep, StepCompletion } from './forensic/WizardN
 import { CaseManager, SavedCase, getDefaultCaseData } from './forensic/CaseManager';
 import { 
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
-  DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES, RETIREMENT_SCENARIOS
+  DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
 } from './forensic/types';
+import {
+  computeAgeAtInjury,
+  computeAlgebraic,
+  computeDateCalc,
+  computeGrandTotal,
+  computeHhsData,
+  computeLcpData,
+  computeProjection,
+  computeScenarioProjections,
+  computeWorkLifeFactor,
+} from "./forensic/calculations";
 import { CaseInfoStep, EarningsStep, NarrativesStep, HouseholdStep, LCPStep, SummaryStep, ReportStep } from './forensic/steps';
 
 // Wizard Steps Configuration
@@ -136,263 +147,64 @@ export default function ForensicSuite() {
     setCurrentStep(0);
   };
 
-  // Date Calculations
-  const dateCalc: DateCalc = useMemo(() => {
-    const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
-    if (!caseInfo.dob || !caseInfo.dateOfInjury || !caseInfo.dateOfTrial) 
-      return { ageInjury: '0', ageTrial: '0', currentAge: '0', pastYears: 0, derivedYFS: 0 };
+  const dateCalc: DateCalc = useMemo(() => computeDateCalc(caseInfo), [caseInfo]);
 
-    const dob = new Date(caseInfo.dob);
-    const doi = new Date(caseInfo.dateOfInjury);
-    const dot = new Date(caseInfo.dateOfTrial);
-    const now = new Date();
+  const workLifeFactor = useMemo(
+    () => computeWorkLifeFactor(earningsParams, dateCalc.derivedYFS),
+    [earningsParams.wle, dateCalc.derivedYFS],
+  );
 
-    const getAge = (d: Date) => (d.getTime() - dob.getTime()) / msPerYear;
-    const pastYears = Math.max(0, (dot.getTime() - doi.getTime()) / msPerYear);
-    
-    const targetRetirementDate = new Date(dob);
-    targetRetirementDate.setFullYear(dob.getFullYear() + caseInfo.retirementAge);
-    const derivedYFS = Math.max(0, (targetRetirementDate.getTime() - dot.getTime()) / msPerYear);
+  const algebraic: Algebraic = useMemo(
+    () => computeAlgebraic(earningsParams, dateCalc, isUnionMode),
+    [earningsParams, dateCalc, isUnionMode],
+  );
 
-    return { ageInjury: getAge(doi).toFixed(1), ageTrial: getAge(dot).toFixed(1), currentAge: getAge(now).toFixed(1), pastYears, derivedYFS };
-  }, [caseInfo]);
+  const projection: Projection = useMemo(
+    () => computeProjection(caseInfo, earningsParams, algebraic, pastActuals, dateCalc),
+    [caseInfo.dateOfInjury, earningsParams, algebraic, pastActuals, dateCalc],
+  );
 
-  const workLifeFactor = useMemo(() => {
-    if (dateCalc.derivedYFS <= 0) return 0;
-    return (earningsParams.wle / dateCalc.derivedYFS) * 100;
-  }, [earningsParams.wle, dateCalc.derivedYFS]);
+  const hhsData: HhsData = useMemo(
+    () => computeHhsData(hhServices, dateCalc.derivedYFS),
+    [hhServices, dateCalc.derivedYFS],
+  );
 
-  // Algebraic Calculations
-  const algebraic: Algebraic = useMemo(() => {
-    const yfs = dateCalc.derivedYFS;
-    const wlf = yfs > 0 ? (earningsParams.wle / yfs) : 0;
-    const unempFactor = 1 - ((earningsParams.unemploymentRate / 100) * (1 - (earningsParams.uiReplacementRate / 100)));
-    const afterTaxFactor = (1 - (earningsParams.fedTaxRate / 100)) * (1 - (earningsParams.stateTaxRate / 100));
-    
-    let fringeFactor = 1;
-    let flatFringeAmount = 0;
+  const lcpData: LcpData = useMemo(
+    () => computeLcpData(lcpItems, earningsParams.discountRate),
+    [lcpItems, earningsParams.discountRate],
+  );
 
-    if (isUnionMode) {
-      flatFringeAmount = earningsParams.pension + earningsParams.healthWelfare + earningsParams.annuity + earningsParams.clothingAllowance + earningsParams.otherBenefits;
-      const effectiveFringeRate = earningsParams.baseEarnings > 0 ? (flatFringeAmount / earningsParams.baseEarnings) : 0;
-      fringeFactor = 1 + effectiveFringeRate;
-    } else {
-      fringeFactor = 1 + (earningsParams.fringeRate / 100);
-    }
+  const ageAtInjury = useMemo(
+    () => computeAgeAtInjury(caseInfo),
+    [caseInfo.dob, caseInfo.dateOfInjury],
+  );
 
-    const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
-    const realizedMultiplier = afterTaxFactor * fringeFactor;
-    const combinedTaxRate = 1 - afterTaxFactor;
-
-    return { wlf, unempFactor, afterTaxFactor, fringeFactor, fullMultiplier, realizedMultiplier, yfs, flatFringeAmount, combinedTaxRate };
-  }, [dateCalc, earningsParams, isUnionMode]);
-
-  // Projection Engine
-  const projection: Projection = useMemo(() => {
-    const pastSchedule: Projection['pastSchedule'] = [];
-    const futureSchedule: Projection['futureSchedule'] = [];
-    let totalPastLoss = 0, totalFutureNominal = 0, totalFuturePV = 0;
-
-    if (!caseInfo.dateOfInjury) return { pastSchedule, futureSchedule, totalPastLoss, totalFutureNominal, totalFuturePV };
-
-    const startYear = new Date(caseInfo.dateOfInjury).getFullYear();
-    const fullPast = Math.floor(dateCalc.pastYears);
-    const partialPast = dateCalc.pastYears % 1;
-    
-    for (let i = 0; i <= fullPast; i++) {
-      const fraction = (i === fullPast && partialPast > 0) ? partialPast : (i === fullPast && partialPast === 0 ? 0 : 1);
-      if (fraction <= 0) continue;
-
-      const currentYear = startYear + i;
-      const growth = Math.pow(1 + (earningsParams.wageGrowth/100), i);
-      const grossBase = earningsParams.baseEarnings * growth * fraction;
-      const netButFor = grossBase * algebraic.fullMultiplier;
-
-      let netActual = 0, grossActual = 0, isManual = false;
-
-      if (pastActuals[currentYear] !== undefined && pastActuals[currentYear] !== "") {
-        grossActual = parseFloat(pastActuals[currentYear]);
-        netActual = grossActual * algebraic.realizedMultiplier;
-        isManual = true;
-      } else {
-        grossActual = earningsParams.residualEarnings * growth * fraction;
-        netActual = grossActual * algebraic.fullMultiplier;
-      }
-
-      const netLoss = netButFor - netActual;
-      totalPastLoss += netLoss;
-      pastSchedule.push({ year: currentYear, label: `Past-${i+1}`, grossBase, grossActual, netLoss, isManual, fraction });
-    }
-
-    const futureYears = Math.ceil(algebraic.yfs);
-    for (let i = 0; i < futureYears; i++) {
-      const growth = Math.pow(1 + (earningsParams.wageGrowth/100), i);
-      const discount = 1 / Math.pow(1 + (earningsParams.discountRate/100), i + 0.5);
-      const grossBase = earningsParams.baseEarnings * growth;
-      const netButFor = grossBase * algebraic.fullMultiplier;
-      const grossRes = earningsParams.residualEarnings * growth;
-      const netActual = grossRes * algebraic.fullMultiplier;
-      const netLoss = netButFor - netActual;
-      const pv = netLoss * discount;
-      
-      totalFutureNominal += netLoss;
-      totalFuturePV += pv;
-      futureSchedule.push({ year: i+1, gross: grossBase, netLoss, pv });
-    }
-    return { pastSchedule, futureSchedule, totalPastLoss, totalFutureNominal, totalFuturePV };
-  }, [earningsParams, algebraic, pastActuals, caseInfo.dateOfInjury, dateCalc]);
-
-  // Household Services
-  const hhsData: HhsData = useMemo(() => {
-    if (!hhServices.active) return { totalNom: 0, totalPV: 0 };
-    let totalNom = 0, totalPV = 0;
-    const years = Math.ceil(dateCalc.derivedYFS);
-    for(let i=0; i<years; i++) {
-      const annualValue = hhServices.hoursPerWeek * 52 * hhServices.hourlyRate * Math.pow(1 + hhServices.growthRate/100, i);
-      const disc = 1 / Math.pow(1 + hhServices.discountRate/100, i + 0.5);
-      totalNom += annualValue;
-      totalPV += annualValue * disc;
-    }
-    return { totalNom, totalPV };
-  }, [hhServices, dateCalc.derivedYFS]);
-
-  // LCP Engine
-  const lcpData: LcpData = useMemo(() => {
-    let totalNom = 0, totalPV = 0;
-    const processed = lcpItems.map(item => {
-      let iNom = 0, iPV = 0;
-      for(let t=0; t<item.duration; t++) {
-        let active = false;
-        if (item.freqType === 'annual') active = true;
-        else if (item.freqType === 'onetime') active = (t === 0);
-        else if (item.freqType === 'recurring') active = (t % item.recurrenceInterval === 0);
-        
-        if (active) {
-          const inf = item.baseCost * Math.pow(1 + (item.cpi/100), t + item.startYear - 1);
-          const disc = 1 / Math.pow(1 + (earningsParams.discountRate/100), t + item.startYear - 0.5);
-          iNom += inf;
-          iPV += (inf * disc);
-        }
-      }
-      totalNom += iNom;
-      totalPV += iPV;
-      return { ...item, totalNom: iNom, totalPV: iPV };
-    });
-    return { items: processed, totalNom, totalPV };
-  }, [lcpItems, earningsParams.discountRate]);
-
-  // Calculate age at injury for scenario comparisons
-  const ageAtInjury = useMemo(() => {
-    if (!caseInfo.dob || !caseInfo.dateOfInjury) return 0;
-    const dobDate = new Date(caseInfo.dob);
-    const injuryDate = new Date(caseInfo.dateOfInjury);
-    return (injuryDate.getTime() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-  }, [caseInfo.dob, caseInfo.dateOfInjury]);
-
-  // Scenario Projections - Calculate damages for all retirement scenarios
-  const scenarioProjections: ScenarioProjection[] = useMemo(() => {
-    if (!caseInfo.dateOfInjury || !caseInfo.dob || ageAtInjury <= 0 || !earningsParams.wle) return [];
-
-    const calculateScenarioProjection = (
-      scenarioId: string,
-      label: string,
-      retirementAge: number
-    ): ScenarioProjection => {
-      const yfs = Math.max(0, retirementAge - ageAtInjury);
-      const wlf = yfs > 0 ? earningsParams.wle / yfs : 0;
-      const wlfPercent = wlf * 100;
-
-      // Calculate algebraic factors for this scenario
-      const unempFactor = 1 - ((earningsParams.unemploymentRate / 100) * (1 - (earningsParams.uiReplacementRate / 100)));
-      const afterTaxFactor = (1 - (earningsParams.fedTaxRate / 100)) * (1 - (earningsParams.stateTaxRate / 100));
-      let fringeFactor = 1;
-      if (isUnionMode) {
-        const flatFringe = earningsParams.pension + earningsParams.healthWelfare + earningsParams.annuity + earningsParams.clothingAllowance + earningsParams.otherBenefits;
-        fringeFactor = earningsParams.baseEarnings > 0 ? 1 + (flatFringe / earningsParams.baseEarnings) : 1;
-      } else {
-        fringeFactor = 1 + (earningsParams.fringeRate / 100);
-      }
-      const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
-      const realizedMultiplier = afterTaxFactor * fringeFactor;
-
-      // Past losses (same for all scenarios)
-      let totalPastLoss = 0;
-      const startYear = new Date(caseInfo.dateOfInjury).getFullYear();
-      const fullPast = Math.floor(dateCalc.pastYears);
-      const partialPast = dateCalc.pastYears % 1;
-
-      for (let i = 0; i <= fullPast; i++) {
-        const fraction = (i === fullPast && partialPast > 0) ? partialPast : (i === fullPast && partialPast === 0 ? 0 : 1);
-        if (fraction <= 0) continue;
-
-        const currentYear = startYear + i;
-        const growth = Math.pow(1 + (earningsParams.wageGrowth / 100), i);
-        const grossBase = earningsParams.baseEarnings * growth * fraction;
-        const netButFor = grossBase * fullMultiplier;
-
-        let netActual = 0;
-        if (pastActuals[currentYear] !== undefined && pastActuals[currentYear] !== "") {
-          const grossActual = parseFloat(pastActuals[currentYear]);
-          netActual = grossActual * realizedMultiplier;
-        } else {
-          const grossActual = earningsParams.residualEarnings * growth * fraction;
-          netActual = grossActual * fullMultiplier;
-        }
-        totalPastLoss += (netButFor - netActual);
-      }
-
-      // Future losses with scenario-specific YFS
-      let totalFuturePV = 0;
-      const futureYears = Math.ceil(yfs);
-      for (let i = 0; i < futureYears; i++) {
-        const growth = Math.pow(1 + (earningsParams.wageGrowth / 100), i);
-        const discount = 1 / Math.pow(1 + (earningsParams.discountRate / 100), i + 0.5);
-        const grossBase = earningsParams.baseEarnings * growth;
-        const netButFor = grossBase * fullMultiplier;
-        const grossRes = earningsParams.residualEarnings * growth;
-        const netActual = grossRes * fullMultiplier;
-        const netLoss = netButFor - netActual;
-        totalFuturePV += (netLoss * discount);
-      }
-
-      const totalEarningsLoss = totalPastLoss + totalFuturePV;
-      const grandTotal = totalEarningsLoss + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV;
-
-      return {
-        id: scenarioId,
-        label,
-        retirementAge,
-        yfs,
-        wlf,
-        wlfPercent,
-        totalPastLoss,
-        totalFuturePV,
-        totalEarningsLoss,
-        grandTotal,
-        included: true // Default all scenarios to included
-      };
-    };
-
-    const scenarios: ScenarioProjection[] = [];
-
-    // WLE-based scenario
-    const wleRetAge = (ageAtInjury ?? 0) + (earningsParams.wle ?? 0);
-    if (wleRetAge > 0) {
-      scenarios.push(calculateScenarioProjection('wle', `WLE (Age ${wleRetAge.toFixed(1)})`, wleRetAge));
-    }
-
-    // Standard age scenarios
-    for (const scenario of RETIREMENT_SCENARIOS.filter(s => s.retirementAge !== null)) {
-      scenarios.push(calculateScenarioProjection(scenario.id, scenario.label, scenario.retirementAge!));
-    }
-
-    // PJI scenario if enabled
-    if (earningsParams.enablePJI) {
-      scenarios.push(calculateScenarioProjection('pji', `PJI (Age ${earningsParams.pjiAge})`, earningsParams.pjiAge));
-    }
-
-    return scenarios;
-  }, [caseInfo.dateOfInjury, caseInfo.dob, ageAtInjury, earningsParams, isUnionMode, dateCalc.pastYears, pastActuals, hhServices.active, hhsData.totalPV, lcpData.totalPV]);
+  const scenarioProjections: ScenarioProjection[] = useMemo(
+    () =>
+      computeScenarioProjections({
+        caseInfo,
+        ageAtInjury,
+        earningsParams,
+        dateCalc,
+        pastActuals,
+        isUnionMode,
+        hhServices,
+        hhsData,
+        lcpData,
+      }),
+    [
+      caseInfo.dateOfInjury,
+      caseInfo.dob,
+      ageAtInjury,
+      earningsParams,
+      isUnionMode,
+      dateCalc.pastYears,
+      pastActuals,
+      hhServices.active,
+      hhsData.totalPV,
+      lcpData.totalPV,
+    ],
+  );
 
   const [scenarioIncluded, setScenarioIncluded] = React.useState<Record<string, boolean>>({});
 
@@ -409,7 +221,10 @@ export default function ForensicSuite() {
 
   const fmtUSD = useCallback((n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n), []);
   const fmtPct = useCallback((n: number) => `${(n * 100).toFixed(2)}%`, []);
-  const grandTotal = projection.totalPastLoss + projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV;
+  const grandTotal = useMemo(
+    () => computeGrandTotal(projection, hhServices, hhsData, lcpData),
+    [projection.totalPastLoss, projection.totalFuturePV, hhServices.active, hhsData.totalPV, lcpData.totalPV],
+  );
 
   const handleExportPdf = useCallback(async () => {
     if (!reportRef.current) return;
