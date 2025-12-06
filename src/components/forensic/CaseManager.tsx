@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, FolderOpen, Trash2, Plus, X, FileText } from 'lucide-react';
+import { Save, FolderOpen, Trash2, Plus, X, FileText, Upload, BarChart3, Download } from 'lucide-react';
 import { CaseInfo, EarningsParams, HhServices, LcpItem, DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES } from './types';
 
 export interface SavedCase {
@@ -26,9 +26,11 @@ interface CaseManagerProps {
   };
   onLoadCase: (savedCase: SavedCase) => void;
   onNewCase: () => void;
+  onOpenImport?: () => void;
+  onOpenDashboard?: () => void;
 }
 
-export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCase, onNewCase }) => {
+export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCase, onNewCase, onOpenImport, onOpenDashboard }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -64,9 +66,19 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
     setSavedCases(updated);
   };
 
-  const loadCase = (savedCase: SavedCase) => {
-    onLoadCase(savedCase);
+  const loadCase = (caseToLoad: SavedCase) => {
+    onLoadCase(caseToLoad);
     setIsOpen(false);
+  };
+
+  const exportCase = (caseToExport: SavedCase) => {
+    const blob = new Blob([JSON.stringify(caseToExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${caseToExport.name.replace(/[^a-z0-9]/gi, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const loadSampleCases = () => {
@@ -225,6 +237,22 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
                 >
                   <Plus className="w-4 h-4" /> New Case
                 </button>
+                {onOpenImport && (
+                  <button
+                    onClick={() => { setIsOpen(false); onOpenImport(); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600"
+                  >
+                    <Upload className="w-4 h-4" /> Import
+                  </button>
+                )}
+                {onOpenDashboard && (
+                  <button
+                    onClick={() => { setIsOpen(false); onOpenDashboard(); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600"
+                  >
+                    <BarChart3 className="w-4 h-4" /> Dashboard
+                  </button>
+                )}
                 <button
                   onClick={loadSampleCases}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600"
@@ -278,7 +306,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1">
                         <button
                           onClick={() => loadCase(c)}
                           className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90"
@@ -286,8 +314,16 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
                           Load
                         </button>
                         <button
+                          onClick={() => exportCase(c)}
+                          className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded"
+                          title="Export as JSON"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => deleteCase(c.id)}
                           className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
