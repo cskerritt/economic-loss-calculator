@@ -9,6 +9,8 @@ import { saveAs } from 'file-saver';
 
 import { WizardNavigation, WizardStep, StepCompletion } from './forensic/WizardNavigation';
 import { CaseManager, SavedCase, getDefaultCaseData } from './forensic/CaseManager';
+import { ThemeToggle } from './ThemeToggle';
+import { ExportHistory, addExportRecord } from './ExportHistory';
 import { 
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
   DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
@@ -339,10 +341,11 @@ export default function ForensicSuite() {
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
       await html2pdf().set(opt).from(reportRef.current).save();
+      addExportRecord({ type: 'pdf', plaintiffName: caseInfo.plaintiff, grandTotal });
     } finally {
       setIsExportingPdf(false);
     }
-  }, [caseInfo.plaintiff]);
+  }, [caseInfo.plaintiff, grandTotal]);
 
   const handleExportWord = useCallback(async () => {
     setIsExportingWord(true);
@@ -358,10 +361,16 @@ export default function ForensicSuite() {
       });
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}.docx`);
+      addExportRecord({ type: 'word', plaintiffName: caseInfo.plaintiff, grandTotal });
     } finally {
       setIsExportingWord(false);
     }
   }, [caseInfo.plaintiff, grandTotal, fmtUSD]);
+
+  const handlePrint = useCallback(() => {
+    addExportRecord({ type: 'print', plaintiffName: caseInfo.plaintiff, grandTotal });
+    window.print();
+  }, [caseInfo.plaintiff, grandTotal]);
 
   const renderStep = () => {
     switch (WIZARD_STEPS[currentStep].id) {
@@ -399,7 +408,7 @@ export default function ForensicSuite() {
             selectedScenario={earningsParams.selectedScenario}
             validationChecks={essentialChecks}
             onGoToStep={setCurrentStep}
-            onPrint={() => window.print()}
+            onPrint={handlePrint}
             onExportPdf={handleExportPdf}
             onExportWord={handleExportWord}
             fmtUSD={fmtUSD}
@@ -448,6 +457,8 @@ export default function ForensicSuite() {
               onLoadCase={handleLoadCase}
               onNewCase={handleNewCase}
             />
+            <ExportHistory fmtUSD={fmtUSD} />
+            <ThemeToggle />
           </div>
           
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2">
@@ -459,12 +470,14 @@ export default function ForensicSuite() {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-navy-light border-t border-navy p-4 space-y-2 print:hidden">
-          <div className="mb-4">
+          <div className="flex items-center gap-2 mb-4">
             <CaseManager
               currentCase={{ caseInfo, earningsParams, hhServices, lcpItems, pastActuals, isUnionMode }}
               onLoadCase={handleLoadCase}
               onNewCase={handleNewCase}
             />
+            <ExportHistory fmtUSD={fmtUSD} />
+            <ThemeToggle />
           </div>
           {WIZARD_STEPS.map((step, idx) => (
             <button key={step.id} onClick={() => { setCurrentStep(idx); setMobileMenuOpen(false); }} className={`block w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${currentStep === idx ? 'bg-indigo text-primary-foreground' : 'text-muted-foreground hover:bg-navy'}`}>
