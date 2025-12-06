@@ -348,7 +348,8 @@ export default function ForensicSuite() {
         totalPastLoss,
         totalFuturePV,
         totalEarningsLoss,
-        grandTotal
+        grandTotal,
+        included: true // Default all scenarios to included
       };
     };
 
@@ -370,6 +371,19 @@ export default function ForensicSuite() {
 
     return scenarios;
   }, [caseInfo.dateOfInjury, caseInfo.dob, ageAtInjury, earningsParams, isUnionMode, dateCalc.pastYears, pastActuals, hhServices.active, hhsData.totalPV, lcpData.totalPV]);
+
+  const [scenarioIncluded, setScenarioIncluded] = React.useState<Record<string, boolean>>({});
+
+  const scenarioProjectionsWithIncluded = React.useMemo(() => {
+    return scenarioProjections.map(s => ({
+      ...s,
+      included: scenarioIncluded[s.id] ?? true
+    }));
+  }, [scenarioProjections, scenarioIncluded]);
+
+  const handleToggleScenarioIncluded = useCallback((id: string) => {
+    setScenarioIncluded(prev => ({ ...prev, [id]: !(prev[id] ?? true) }));
+  }, []);
 
   const fmtUSD = useCallback((n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n), []);
   const fmtPct = useCallback((n: number) => `${(n * 100).toFixed(2)}%`, []);
@@ -425,7 +439,7 @@ export default function ForensicSuite() {
       case 'lcp':
         return <LCPStep lcpItems={lcpItems} setLcpItems={setLcpItems} lcpData={lcpData} lifeExpectancy={caseInfo.lifeExpectancy} fmtUSD={fmtUSD} />;
       case 'summary':
-        return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} scenarioProjections={scenarioProjections} selectedScenario={earningsParams.selectedScenario} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
+        return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} scenarioProjections={scenarioProjectionsWithIncluded} selectedScenario={earningsParams.selectedScenario} onToggleScenarioIncluded={handleToggleScenarioIncluded} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
       case 'report':
         return (
           <ReportStep
@@ -444,7 +458,7 @@ export default function ForensicSuite() {
             isUnionMode={isUnionMode}
             isExportingPdf={isExportingPdf}
             isExportingWord={isExportingWord}
-            scenarioProjections={scenarioProjections}
+            scenarioProjections={scenarioProjectionsWithIncluded}
             selectedScenario={earningsParams.selectedScenario}
             onPrint={() => window.print()}
             onExportPdf={handleExportPdf}
