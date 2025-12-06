@@ -46,12 +46,14 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
   const startYear = dateOfInjury ? new Date(dateOfInjury).getFullYear() : new Date().getFullYear();
   const fullPast = Math.floor(dateCalc.pastYears);
 
-  // Calculate age at injury
+  // Calculate age at injury (with NaN protection)
   const ageAtInjury = useMemo(() => {
     if (!dob || !dateOfInjury) return 0;
     const dobDate = new Date(dob);
     const injuryDate = new Date(dateOfInjury);
-    return (injuryDate.getTime() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    if (isNaN(dobDate.getTime()) || isNaN(injuryDate.getTime())) return 0;
+    const age = (injuryDate.getTime() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    return isNaN(age) ? 0 : age;
   }, [dob, dateOfInjury]);
 
   // Calculate all retirement scenarios
@@ -174,7 +176,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
         </Card>
 
         {/* Retirement Scenarios */}
-        <Card className="p-5 border-l-4 border-l-amber">
+        <Card className="p-5 border-l-4 border-l-amber-500">
           <SectionHeader icon={Target} title="Retirement Scenarios" subtitle="Compare different retirement ages" />
           
           <div className="space-y-3">
@@ -246,7 +248,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
             </div>
 
             {/* Selected Scenario Summary */}
-            <div className="bg-amber/10 p-3 rounded-lg mt-3">
+            <div className="bg-amber-500/10 p-3 rounded-lg mt-3">
               <h4 className="text-[10px] font-bold uppercase text-amber-600 mb-2">Selected: {selectedScenarioData?.label ?? 'N/A'}</h4>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>

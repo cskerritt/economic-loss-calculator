@@ -34,30 +34,50 @@ export default function ForensicSuite() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingWord, setIsExportingWord] = useState(false);
 
-  // Persistent State
+  // Persistent State with error handling for corrupted localStorage
   const [caseInfo, setCaseInfo] = useState<CaseInfo>(() => {
-    const saved = localStorage.getItem('fs_case_v10');
-    return saved ? JSON.parse(saved) : DEFAULT_CASE_INFO;
+    try {
+      const saved = localStorage.getItem('fs_case_v10');
+      return saved ? { ...DEFAULT_CASE_INFO, ...JSON.parse(saved) } : DEFAULT_CASE_INFO;
+    } catch {
+      return DEFAULT_CASE_INFO;
+    }
   });
 
   const [earningsParams, setEarningsParams] = useState<EarningsParams>(() => {
-    const saved = localStorage.getItem('fs_params_v10');
-    return saved ? JSON.parse(saved) : DEFAULT_EARNINGS_PARAMS;
+    try {
+      const saved = localStorage.getItem('fs_params_v10');
+      return saved ? { ...DEFAULT_EARNINGS_PARAMS, ...JSON.parse(saved) } : DEFAULT_EARNINGS_PARAMS;
+    } catch {
+      return DEFAULT_EARNINGS_PARAMS;
+    }
   });
 
   const [hhServices, setHhServices] = useState<HhServices>(() => {
-    const saved = localStorage.getItem('fs_hhs_v10');
-    return saved ? JSON.parse(saved) : DEFAULT_HH_SERVICES;
+    try {
+      const saved = localStorage.getItem('fs_hhs_v10');
+      return saved ? { ...DEFAULT_HH_SERVICES, ...JSON.parse(saved) } : DEFAULT_HH_SERVICES;
+    } catch {
+      return DEFAULT_HH_SERVICES;
+    }
   });
 
   const [pastActuals, setPastActuals] = useState<Record<number, string>>(() => {
-    const saved = localStorage.getItem('fs_past_actuals_v10');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem('fs_past_actuals_v10');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
   });
 
   const [lcpItems, setLcpItems] = useState<LcpItem[]>(() => {
-    const saved = localStorage.getItem('fs_lcp_v10');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('fs_lcp_v10');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   // Auto-Save
@@ -271,7 +291,7 @@ export default function ForensicSuite() {
 
   // Scenario Projections - Calculate damages for all retirement scenarios
   const scenarioProjections: ScenarioProjection[] = useMemo(() => {
-    if (!caseInfo.dateOfInjury || !caseInfo.dob || ageAtInjury <= 0) return [];
+    if (!caseInfo.dateOfInjury || !caseInfo.dob || ageAtInjury <= 0 || !earningsParams.wle) return [];
 
     const calculateScenarioProjection = (
       scenarioId: string,
@@ -356,8 +376,10 @@ export default function ForensicSuite() {
     const scenarios: ScenarioProjection[] = [];
 
     // WLE-based scenario
-    const wleRetAge = ageAtInjury + earningsParams.wle;
-    scenarios.push(calculateScenarioProjection('wle', `WLE (Age ${wleRetAge.toFixed(1)})`, wleRetAge));
+    const wleRetAge = (ageAtInjury ?? 0) + (earningsParams.wle ?? 0);
+    if (wleRetAge > 0) {
+      scenarios.push(calculateScenarioProjection('wle', `WLE (Age ${wleRetAge.toFixed(1)})`, wleRetAge));
+    }
 
     // Standard age scenarios
     for (const scenario of RETIREMENT_SCENARIOS.filter(s => s.retirementAge !== null)) {
