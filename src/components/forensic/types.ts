@@ -126,6 +126,19 @@ export interface Projection {
   totalFuturePV: number;
 }
 
+export interface ScenarioProjection {
+  id: string;
+  label: string;
+  retirementAge: number;
+  yfs: number;
+  wlf: number;
+  wlfPercent: number;
+  totalPastLoss: number;
+  totalFuturePV: number;
+  totalEarningsLoss: number;
+  grandTotal: number;
+}
+
 export interface HhsData {
   totalNom: number;
   totalPV: number;

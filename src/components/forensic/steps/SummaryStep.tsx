@@ -1,7 +1,7 @@
 import React from 'react';
-import { Table, Copy, Check } from 'lucide-react';
+import { Table, Copy, Check, Target } from 'lucide-react';
 import { Card } from '../ui';
-import { Projection, HhServices, HhsData, LcpData, Algebraic } from '../types';
+import { Projection, HhServices, HhsData, LcpData, Algebraic, ScenarioProjection } from '../types';
 
 interface SummaryStepProps {
   projection: Projection;
@@ -11,6 +11,8 @@ interface SummaryStepProps {
   algebraic: Algebraic;
   workLifeFactor: number;
   grandTotal: number;
+  scenarioProjections: ScenarioProjection[];
+  selectedScenario: string;
   fmtUSD: (n: number) => string;
   fmtPct: (n: number) => string;
 }
@@ -23,6 +25,8 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   algebraic,
   workLifeFactor,
   grandTotal,
+  scenarioProjections,
+  selectedScenario,
   fmtUSD,
   fmtPct
 }) => {
@@ -122,6 +126,59 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
           </div>
         </Card>
       </div>
+
+      {/* Retirement Scenario Comparison */}
+      {scenarioProjections.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="bg-muted border-b border-border p-3 flex items-center gap-2">
+            <Target className="w-4 h-4 text-amber-500" />
+            <span className="text-sm font-bold uppercase text-muted-foreground">Retirement Scenario Comparison</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="p-3 text-left font-bold">Scenario</th>
+                  <th className="p-3 text-right font-bold">Ret. Age</th>
+                  <th className="p-3 text-right font-bold">YFS</th>
+                  <th className="p-3 text-right font-bold">WLF</th>
+                  <th className="p-3 text-right font-bold">Past Loss</th>
+                  <th className="p-3 text-right font-bold">Future (PV)</th>
+                  <th className="p-3 text-right font-bold">Earnings Total</th>
+                  <th className="p-3 text-right font-bold bg-primary/10">Grand Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {scenarioProjections.map(scenario => (
+                  <tr 
+                    key={scenario.id} 
+                    className={scenario.id === selectedScenario ? 'bg-primary/10' : 'hover:bg-muted/50'}
+                  >
+                    <td className="p-3 text-left">
+                      <span className={scenario.id === selectedScenario ? 'font-bold text-primary' : ''}>
+                        {scenario.label}
+                      </span>
+                      {scenario.id === selectedScenario && (
+                        <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
+                    <td className="p-3 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
+                    <td className="p-3 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
+                    <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
+                    <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
+                    <td className="p-3 text-right font-mono font-bold">{fmtUSD(scenario.totalEarningsLoss)}</td>
+                    <td className="p-3 text-right font-mono font-bold text-primary bg-primary/5">{fmtUSD(scenario.grandTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
+            <strong>Note:</strong> Grand Total includes earnings loss, household services (if enabled), and life care plan costs. The active scenario is highlighted and used for primary damage calculations.
+          </div>
+        </Card>
+      )}
 
       {/* Damage Schedule Table */}
       <Card className="overflow-hidden">
