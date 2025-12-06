@@ -223,6 +223,10 @@ export default function ForensicSuite() {
       lcpData.totalPV,
     ],
   );
+  const baseCalendarYear = useMemo(() => {
+    const year = caseInfo.dateOfTrial ? new Date(caseInfo.dateOfTrial).getFullYear() : new Date().getFullYear();
+    return Number.isFinite(year) ? year : new Date().getFullYear();
+  }, [caseInfo.dateOfTrial]);
 
   const [scenarioIncluded, setScenarioIncluded] = React.useState<Record<string, boolean>>({});
 
@@ -314,7 +318,7 @@ export default function ForensicSuite() {
       case 'household':
         return <HouseholdStep hhServices={hhServices} setHhServices={setHhServices} hhsData={hhsData} fmtUSD={fmtUSD} />;
       case 'lcp':
-        return <LCPStep lcpItems={lcpItems} setLcpItems={setLcpItems} lcpData={lcpData} lifeExpectancy={caseInfo.lifeExpectancy} fmtUSD={fmtUSD} />;
+        return <LCPStep lcpItems={lcpItems} setLcpItems={setLcpItems} lcpData={lcpData} lifeExpectancy={caseInfo.lifeExpectancy} fmtUSD={fmtUSD} baseYear={baseCalendarYear} />;
       case 'summary':
         return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} scenarioProjections={scenarioProjectionsWithIncluded} selectedScenario={earningsParams.selectedScenario} onToggleScenarioIncluded={handleToggleScenarioIncluded} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
       case 'report':
