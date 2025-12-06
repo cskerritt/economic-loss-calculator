@@ -40,6 +40,9 @@ interface InputGroupProps {
   placeholder?: string;
   step?: string;
   className?: string;
+  required?: boolean;
+  error?: string;
+  onBlur?: () => void;
 }
 
 export const InputGroup: React.FC<InputGroupProps> = ({
@@ -52,33 +55,49 @@ export const InputGroup: React.FC<InputGroupProps> = ({
   disabled = false,
   placeholder = "",
   step = "any",
-  className = ""
-}) => (
-  <div className={`mb-3 ${className}`}>
-    <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</label>
-    <div className={`relative rounded-lg shadow-sm ${disabled ? 'opacity-60' : ''}`}>
-      {prefix && (
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <span className="text-muted-foreground sm:text-sm font-medium">{prefix}</span>
-        </div>
-      )}
-      <input
-        type={type}
-        step={step}
-        value={value}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className={`block w-full rounded-lg border-border py-2 focus:ring-primary focus:border-primary text-sm border px-3 transition-all bg-background text-foreground ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''}`}
-      />
-      {suffix && (
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-          <span className="text-muted-foreground sm:text-sm font-medium">{suffix}</span>
-        </div>
+  className = "",
+  required = false,
+  error,
+  onBlur
+}) => {
+  const hasError = !!error;
+  const isEmpty = value === '' || value === undefined || value === null;
+  const showRequiredIndicator = required && isEmpty;
+  
+  return (
+    <div className={`mb-3 ${className}`}>
+      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </label>
+      <div className={`relative rounded-lg shadow-sm ${disabled ? 'opacity-60' : ''}`}>
+        {prefix && (
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span className="text-muted-foreground sm:text-sm font-medium">{prefix}</span>
+          </div>
+        )}
+        <input
+          type={type}
+          step={step}
+          value={value}
+          disabled={disabled}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          className={`block w-full rounded-lg py-2 focus:ring-2 text-sm border px-3 transition-all bg-background text-foreground ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''} ${hasError || showRequiredIndicator ? 'border-destructive focus:ring-destructive/30 focus:border-destructive' : 'border-border focus:ring-primary/30 focus:border-primary'}`}
+        />
+        {suffix && (
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <span className="text-muted-foreground sm:text-sm font-medium">{suffix}</span>
+          </div>
+        )}
+      </div>
+      {hasError && (
+        <p className="text-[10px] text-destructive mt-1 font-medium">{error}</p>
       )}
     </div>
-  </div>
-);
+  );
+};
 
 interface TextAreaProps {
   label: string;
