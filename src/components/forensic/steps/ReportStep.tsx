@@ -1,6 +1,14 @@
-import React from 'react';
-import { FileText, FileDown, Download, Loader2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { FileText, FileDown, Download, Loader2, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection } from '../types';
+
+export interface ValidationCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  stepId: string;
+  stepLabel: string;
+}
 
 interface ReportStepProps {
   reportRef: React.RefObject<HTMLDivElement>;
@@ -20,6 +28,8 @@ interface ReportStepProps {
   isExportingWord: boolean;
   scenarioProjections: ScenarioProjection[];
   selectedScenario: string;
+  validationChecks?: ValidationCheck[];
+  onGoToStep?: (stepIndex: number) => void;
   onPrint: () => void;
   onExportPdf: () => void;
   onExportWord: () => void;
@@ -45,6 +55,8 @@ export const ReportStep: React.FC<ReportStepProps> = ({
   isExportingWord,
   scenarioProjections,
   selectedScenario,
+  validationChecks = [],
+  onGoToStep,
   onPrint,
   onExportPdf,
   onExportWord,
@@ -55,30 +67,118 @@ export const ReportStep: React.FC<ReportStepProps> = ({
     if (!dateStr) return '[Date]';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
-  const activeScenario = React.useMemo(
+  const activeScenario = useMemo(
     () => scenarioProjections.find((s) => s.id === selectedScenario),
     [scenarioProjections, selectedScenario]
   );
 
+  const failedChecks = validationChecks.filter(c => !c.ok);
+  const passedChecks = validationChecks.filter(c => c.ok);
+  const allValid = failedChecks.length === 0;
+
+  // Group failed checks by step
+  const failedByStep = useMemo(() => {
+    const grouped: Record<string, { stepLabel: string; stepId: string; checks: ValidationCheck[] }> = {};
+    failedChecks.forEach(check => {
+      if (!grouped[check.stepId]) {
+        grouped[check.stepId] = { stepLabel: check.stepLabel, stepId: check.stepId, checks: [] };
+      }
+      grouped[check.stepId].checks.push(check);
+    });
+    return Object.values(grouped);
+  }, [failedChecks]);
+
+  const stepIdToIndex: Record<string, number> = {
+    case: 0,
+    earnings: 1,
+    narratives: 2,
+    household: 3,
+    lcp: 4,
+    summary: 5,
+    report: 6
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Validation Panel */}
+      <div className="print:hidden mb-6">
+        {!allValid ? (
+          <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground">Validation Required</h3>
+                <p className="text-sm text-muted-foreground">
+                  {failedChecks.length} required field{failedChecks.length !== 1 ? 's' : ''} need attention before exporting
+                </p>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              {failedByStep.map(group => (
+                <div key={group.stepId} className="bg-background rounded-lg p-3 border border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase text-muted-foreground">{group.stepLabel}</span>
+                    {onGoToStep && (
+                      <button
+                        onClick={() => onGoToStep(stepIdToIndex[group.stepId] ?? 0)}
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                      >
+                        Go to step <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <ul className="space-y-1">
+                    {group.checks.map(check => (
+                      <li key={check.id} className="flex items-center gap-2 text-sm text-destructive">
+                        <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                        {check.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground">Ready to Export</h3>
+                <p className="text-sm text-muted-foreground">
+                  All {passedChecks.length} required fields are complete
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Export Buttons */}
       <div className="text-center mb-8 print:hidden">
         <h2 className="text-2xl font-bold text-foreground">Generate Report</h2>
         <p className="text-muted-foreground mt-1">Export your complete economic appraisal report</p>
         <div className="flex gap-3 justify-center mt-6 flex-wrap">
-          <button onClick={onPrint} className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2">
+          <button onClick={onPrint} disabled={!allValid} className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             <FileText className="w-5 h-5" /> Print
           </button>
-          <button onClick={onExportPdf} disabled={isExportingPdf} className="bg-rose-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center gap-2 disabled:opacity-50">
+          <button onClick={onExportPdf} disabled={isExportingPdf || !allValid} className="bg-rose-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {isExportingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
             {isExportingPdf ? 'Exporting...' : 'Export PDF'}
           </button>
-          <button onClick={onExportWord} disabled={isExportingWord} className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50">
+          <button onClick={onExportWord} disabled={isExportingWord || !allValid} className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {isExportingWord ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
             {isExportingWord ? 'Exporting...' : 'Export Word'}
           </button>
         </div>
+        {!allValid && (
+          <p className="text-xs text-destructive mt-3">Complete all required fields above to enable export</p>
+        )}
       </div>
 
       <div className="print:hidden bg-muted border border-border rounded-lg p-4 mb-6">
