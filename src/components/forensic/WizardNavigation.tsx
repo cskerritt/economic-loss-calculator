@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, AlertCircle, type LucideIcon } from 'lucide-react';
 
 export interface WizardStep {
   id: string;
@@ -15,10 +15,19 @@ export interface StepCompletion {
   };
 }
 
+export interface ValidationCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  stepId: string;
+  stepLabel: string;
+}
+
 interface WizardNavigationProps {
   steps: WizardStep[];
   currentStep: number;
   stepCompletion: StepCompletion;
+  validationChecks?: ValidationCheck[];
   onStepClick: (index: number) => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -28,10 +37,16 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
   steps,
   currentStep,
   stepCompletion,
+  validationChecks = [],
   onStepClick,
   onNext,
   onPrevious
 }) => {
+  // Get validation errors per step
+  const getStepValidationErrors = (stepId: string): number => {
+    return validationChecks.filter(c => c.stepId === stepId && !c.ok).length;
+  };
+
   return (
     <div className="bg-card border-b border-border sticky top-16 z-40 print:hidden">
       <div className="max-w-7xl mx-auto px-4">
@@ -41,7 +56,9 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
             const Icon = step.icon;
             const isActive = index === currentStep;
             const completion = stepCompletion[step.id];
-            const isComplete = completion?.percentage >= 100;
+            const validationErrors = getStepValidationErrors(step.id);
+            const hasValidationErrors = validationErrors > 0;
+            const isComplete = completion?.percentage >= 100 && !hasValidationErrors;
             const hasProgress = completion?.percentage > 0 && completion?.percentage < 100;
             
             return (
@@ -83,24 +100,38 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
                         ? 'bg-primary text-primary-foreground shadow-lg' 
                         : isComplete
                           ? 'bg-emerald-500 text-white' 
-                          : hasProgress
-                            ? 'bg-amber-500/20 text-amber-600 border-2 border-amber-500'
-                            : 'bg-muted text-muted-foreground'
+                          : hasValidationErrors
+                            ? 'bg-destructive/10 text-destructive border-2 border-destructive'
+                            : hasProgress
+                              ? 'bg-amber-500/20 text-amber-600 border-2 border-amber-500'
+                              : 'bg-muted text-muted-foreground'
                       }
                     `}>
-                      {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                      {isComplete ? (
+                        <Check className="w-5 h-5" />
+                      ) : hasValidationErrors ? (
+                        <AlertCircle className="w-5 h-5" />
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
                     </div>
+                    {/* Validation error badge */}
+                    {hasValidationErrors && !isActive && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center z-20">
+                        {validationErrors}
+                      </span>
+                    )}
                   </div>
                   <span className={`text-[10px] font-medium uppercase tracking-wide ${
-                    isActive ? 'text-primary' : 'text-muted-foreground'
+                    isActive ? 'text-primary' : hasValidationErrors ? 'text-destructive' : 'text-muted-foreground'
                   }`}>
                     {step.label}
                   </span>
                   {completion && (
                     <span className={`text-[9px] ${
-                      isComplete ? 'text-emerald-500' : hasProgress ? 'text-amber-500' : 'text-muted-foreground'
+                      isComplete ? 'text-emerald-500' : hasValidationErrors ? 'text-destructive' : hasProgress ? 'text-amber-500' : 'text-muted-foreground'
                     }`}>
-                      {completion.filled}/{completion.total}
+                      {hasValidationErrors ? `${validationErrors} issue${validationErrors !== 1 ? 's' : ''}` : `${completion.filled}/${completion.total}`}
                     </span>
                   )}
                 </button>

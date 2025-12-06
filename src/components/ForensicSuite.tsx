@@ -243,15 +243,17 @@ export default function ForensicSuite() {
 
   const essentialChecks = useMemo(
     () => [
-      { id: 'plaintiff', label: 'Plaintiff name', ok: !!caseInfo.plaintiff.trim(), stepId: 'case' },
-      { id: 'dob', label: 'Date of birth', ok: !!caseInfo.dob, stepId: 'case' },
-      { id: 'injuryDate', label: 'Date of injury', ok: !!caseInfo.dateOfInjury, stepId: 'case' },
-      { id: 'trialDate', label: 'Trial/valuation date', ok: !!caseInfo.dateOfTrial, stepId: 'case' },
-      { id: 'baseEarnings', label: 'Pre-injury earnings', ok: earningsParams.baseEarnings > 0, stepId: 'earnings' },
-      { id: 'residual', label: 'Residual (post-injury) earnings', ok: earningsParams.residualEarnings >= 0, stepId: 'earnings' },
-      { id: 'wle', label: 'Work life expectancy (years)', ok: earningsParams.wle > 0, stepId: 'earnings' },
+      { id: 'plaintiff', label: 'Plaintiff name', ok: !!caseInfo.plaintiff.trim(), stepId: 'case', stepLabel: 'Case Info' },
+      { id: 'dob', label: 'Date of birth', ok: !!caseInfo.dob, stepId: 'case', stepLabel: 'Case Info' },
+      { id: 'injuryDate', label: 'Date of injury', ok: !!caseInfo.dateOfInjury, stepId: 'case', stepLabel: 'Case Info' },
+      { id: 'trialDate', label: 'Trial/valuation date', ok: !!caseInfo.dateOfTrial, stepId: 'case', stepLabel: 'Case Info' },
+      { id: 'lifeExpectancy', label: 'Life expectancy', ok: caseInfo.lifeExpectancy > 0, stepId: 'case', stepLabel: 'Case Info' },
+      { id: 'baseEarnings', label: 'Pre-injury earnings', ok: earningsParams.baseEarnings > 0, stepId: 'earnings', stepLabel: 'Earnings' },
+      { id: 'wle', label: 'Work life expectancy', ok: earningsParams.wle > 0, stepId: 'earnings', stepLabel: 'Earnings' },
+      { id: 'wageGrowth', label: 'Wage growth rate', ok: earningsParams.wageGrowth >= 0, stepId: 'earnings', stepLabel: 'Earnings' },
+      { id: 'discountRate', label: 'Discount rate', ok: earningsParams.discountRate >= 0, stepId: 'earnings', stepLabel: 'Earnings' },
     ],
-    [caseInfo.plaintiff, caseInfo.dob, caseInfo.dateOfInjury, caseInfo.dateOfTrial, earningsParams.baseEarnings, earningsParams.residualEarnings, earningsParams.wle],
+    [caseInfo.plaintiff, caseInfo.dob, caseInfo.dateOfInjury, caseInfo.dateOfTrial, caseInfo.lifeExpectancy, earningsParams.baseEarnings, earningsParams.wle, earningsParams.wageGrowth, earningsParams.discountRate],
   );
 
   const nextNeededStepIndex = useMemo(() => {
@@ -341,6 +343,8 @@ export default function ForensicSuite() {
             isExportingWord={isExportingWord}
             scenarioProjections={scenarioProjectionsWithIncluded}
             selectedScenario={earningsParams.selectedScenario}
+            validationChecks={essentialChecks}
+            onGoToStep={setCurrentStep}
             onPrint={() => window.print()}
             onExportPdf={handleExportPdf}
             onExportWord={handleExportWord}
@@ -407,6 +411,7 @@ export default function ForensicSuite() {
         steps={WIZARD_STEPS} 
         currentStep={currentStep}
         stepCompletion={stepCompletion}
+        validationChecks={essentialChecks}
         onStepClick={setCurrentStep}
         onNext={() => setCurrentStep(Math.min(currentStep + 1, WIZARD_STEPS.length - 1))}
         onPrevious={() => setCurrentStep(Math.max(currentStep - 1, 0))}
