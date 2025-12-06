@@ -205,11 +205,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
           <div className="bg-card rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
             <div className="p-4 border-b border-border flex justify-between items-center">
               <h2 className="text-lg font-bold text-foreground">Case Manager</h2>
-              <button 
-                onClick={() => setIsOpen(false)} 
-                className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors"
-                aria-label="Close"
-              >
+              <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-muted rounded">
                 <X className="w-5 h-5" />
               </button>
             </div>
