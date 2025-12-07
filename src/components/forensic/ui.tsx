@@ -63,6 +63,30 @@ export const InputGroup: React.FC<InputGroupProps> = ({
   const hasError = !!error;
   const isEmpty = value === '' || value === undefined || value === null;
   const showRequiredIndicator = required && isEmpty;
+
+  const formatDateInput = (input: string): string => {
+    // Remove all non-numeric characters
+    const digits = input.replace(/\D/g, '');
+    
+    // Build formatted date string with auto-dashes
+    let formatted = '';
+    for (let i = 0; i < digits.length && i < 8; i++) {
+      if (i === 4 || i === 6) {
+        formatted += '-';
+      }
+      formatted += digits[i];
+    }
+    return formatted;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (type === 'date') {
+      const formatted = formatDateInput(e.target.value);
+      onChange(formatted);
+    } else {
+      onChange(e.target.value);
+    }
+  };
   
   return (
     <div className={`mb-3 ${className}`}>
@@ -82,8 +106,9 @@ export const InputGroup: React.FC<InputGroupProps> = ({
           value={value}
           disabled={disabled}
           placeholder={type === 'date' ? 'YYYY-MM-DD' : placeholder}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleChange}
           onBlur={onBlur}
+          maxLength={type === 'date' ? 10 : undefined}
           className={`block w-full rounded-lg py-2 focus:ring-2 text-sm border px-3 transition-all bg-background text-foreground ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''} ${hasError || showRequiredIndicator ? 'border-destructive focus:ring-destructive/30 focus:border-destructive' : 'border-border focus:ring-primary/30 focus:border-primary'}`}
         />
         {suffix && (
