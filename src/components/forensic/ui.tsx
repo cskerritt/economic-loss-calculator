@@ -83,12 +83,25 @@ export const InputGroup: React.FC<InputGroupProps> = ({
     return isNaN(num) ? '' : num.toString();
   };
 
+  const formatCurrencyDisplay = (input: string): string => {
+    if (input === '' || input === '-') return input;
+    const cleaned = input.replace(/[^\d.-]/g, '');
+    const num = parseFloat(cleaned);
+    if (isNaN(num)) return '';
+    // Format with thousand separators, preserve decimals
+    const parts = num.toString().split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+  };
+
+  const isCurrencyField = prefix === '$';
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (type === 'date') {
       const formatted = formatDateInput(e.target.value);
       onChange(formatted);
     } else if (type === 'number') {
-      // Allow typing but filter invalid chars except decimal/minus
+      // Strip commas and invalid chars for raw value
       const val = e.target.value.replace(/[^\d.-]/g, '');
       onChange(val);
     } else {
@@ -105,6 +118,11 @@ export const InputGroup: React.FC<InputGroupProps> = ({
     }
     onBlur?.();
   };
+
+  // Display value with formatting for currency fields
+  const displayValue = type === 'number' && isCurrencyField 
+    ? formatCurrencyDisplay(String(value)) 
+    : value;
   
   return (
     <div className={`mb-3 ${className}`}>
@@ -122,7 +140,7 @@ export const InputGroup: React.FC<InputGroupProps> = ({
           type={type === 'number' ? 'text' : (type === 'date' ? 'text' : type)}
           inputMode={type === 'number' ? 'decimal' : undefined}
           step={step}
-          value={value}
+          value={displayValue}
           disabled={disabled}
           placeholder={type === 'date' ? 'YYYY-MM-DD' : placeholder}
           onChange={handleChange}
