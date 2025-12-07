@@ -13,7 +13,8 @@ import { ThemeToggle } from './ThemeToggle';
 import { ExportHistory, addExportRecord } from './ExportHistory';
 import { DataImport } from './DataImport';
 import { Dashboard } from './Dashboard';
-import { 
+import { UserMenu } from './UserMenu';
+import {
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
   DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
 } from './forensic/types';
@@ -425,20 +426,20 @@ export default function ForensicSuite() {
   };
 
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground pb-20 print:bg-white print:pb-0">
+    <div className="min-h-screen bg-background font-sans text-foreground pb-24 md:pb-20 print:bg-white print:pb-0">
       {/* Navbar */}
       <nav className="bg-navy text-primary-foreground sticky top-0 z-50 shadow-lg print:hidden">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-indigo to-indigo-light p-2 rounded-lg shadow-lg">
-              <Sigma className="w-5 h-5 text-primary-foreground" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-gradient-to-br from-indigo to-indigo-light p-1.5 sm:p-2 rounded-lg shadow-lg">
+              <Sigma className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-lg tracking-tight">ForensicSuite <span className="text-indigo-light font-light">V10</span></h1>
+              <h1 className="font-bold text-sm sm:text-lg tracking-tight">ForensicSuite <span className="text-indigo-light font-light">V10</span></h1>
             </div>
           </div>
           
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-4">
             {/* Auto-save indicator */}
             <div className={`flex items-center gap-1.5 text-xs transition-all duration-300 ${saveIndicatorVisible ? 'text-emerald-400' : 'text-muted-foreground'}`}>
               {saveIndicatorVisible ? (
@@ -465,18 +466,28 @@ export default function ForensicSuite() {
             />
             <ExportHistory fmtUSD={fmtUSD} />
             <ThemeToggle />
+            <UserMenu />
           </div>
-          
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2">
-            {mobileMenuOpen ? <X /> : <Menu />}
-          </button>
+
+          {/* Mobile/Tablet Header Actions */}
+          <div className="flex lg:hidden items-center gap-1">
+            <ThemeToggle />
+            <UserMenu />
+            <button 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+              className="p-2 rounded-lg hover:bg-primary/20 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </nav>
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-navy-light border-t border-navy p-4 space-y-2 print:hidden">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="lg:hidden bg-navy-light border-t border-navy p-3 sm:p-4 space-y-2 print:hidden animate-in">
+          <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-navy">
             <CaseManager
               currentCase={{ caseInfo, earningsParams, hhServices, lcpItems, pastActuals, isUnionMode }}
               onLoadCase={handleLoadCase}
@@ -485,13 +496,26 @@ export default function ForensicSuite() {
               onOpenDashboard={() => setShowDashboard(true)}
             />
             <ExportHistory fmtUSD={fmtUSD} />
-            <ThemeToggle />
           </div>
-          {WIZARD_STEPS.map((step, idx) => (
-            <button key={step.id} onClick={() => { setCurrentStep(idx); setMobileMenuOpen(false); }} className={`block w-full text-left px-4 py-3 rounded-lg text-sm font-medium ${currentStep === idx ? 'bg-indigo text-primary-foreground' : 'text-muted-foreground hover:bg-navy'}`}>
-              {step.label}
-            </button>
-          ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {WIZARD_STEPS.map((step, idx) => {
+              const Icon = step.icon;
+              return (
+                <button 
+                  key={step.id} 
+                  onClick={() => { setCurrentStep(idx); setMobileMenuOpen(false); }} 
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-xs font-medium transition-all ${
+                    currentStep === idx 
+                      ? 'bg-indigo text-primary-foreground shadow-lg' 
+                      : 'text-muted-foreground hover:bg-navy bg-navy/50'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{step.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -507,38 +531,38 @@ export default function ForensicSuite() {
       />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8 print:p-0">
-        <div className="print:hidden mb-6">
-          <div className="bg-muted border border-border rounded-xl p-4 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 print:p-0">
+        <div className="print:hidden mb-4 sm:mb-6">
+          <div className="bg-muted border border-border rounded-xl p-3 sm:p-4 shadow-sm">
+            <div className="flex flex-col gap-3 mb-3">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-foreground">Quick start checklist</p>
                   <p className="text-xs text-muted-foreground">
-                    Fill the essentials, then jump to the next step that needs attention.
+                    Fill the essentials, then jump to the next step.
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={() => nextNeededStepIndex !== null && nextNeededStepIndex >= 0 && setCurrentStep(nextNeededStepIndex)}
                   disabled={nextNeededStepIndex === null}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium border ${
+                  className={`flex-1 sm:flex-none px-3 py-2.5 rounded-lg text-sm font-medium border transition-all ${
                     nextNeededStepIndex === null
                       ? 'text-muted-foreground border-border cursor-not-allowed'
                       : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
                   }`}
                 >
-                  {nextNeededStepIndex === null ? 'All essentials complete' : 'Jump to next needed step'}
+                  {nextNeededStepIndex === null ? 'All essentials complete' : 'Jump to next needed'}
                 </button>
                 <button
                   onClick={handleNewCase}
-                  className="px-3 py-2 rounded-lg text-sm font-medium border border-border text-muted-foreground hover:bg-background"
+                  className="px-3 py-2.5 rounded-lg text-sm font-medium border border-border text-muted-foreground hover:bg-background transition-all"
                 >
-                  Reset to blank
+                  Reset
                 </button>
               </div>
             </div>
@@ -547,16 +571,18 @@ export default function ForensicSuite() {
                 <div
                   key={item.id}
                   className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${
-                    item.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'
+                    item.ok 
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400' 
+                      : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400'
                   }`}
                 >
-                  {item.ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  <span className="text-xs font-medium">{item.label}</span>
+                  {item.ok ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+                  <span className="text-xs font-medium truncate">{item.label}</span>
                 </div>
               ))}
             </div>
             <div className="text-xs text-muted-foreground mt-3">
-              Essentials complete: {completedEssentials}/{essentialsTotal}
+              Essentials: {completedEssentials}/{essentialsTotal}
             </div>
           </div>
         </div>

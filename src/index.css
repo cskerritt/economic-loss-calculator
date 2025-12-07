@@ -128,6 +128,20 @@
       transform: translateY(0);
     }
   }
+
+  /* Hide scrollbar for step navigation */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area padding for mobile devices */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
 }
 
 @media print {
