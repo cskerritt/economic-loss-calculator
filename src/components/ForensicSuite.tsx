@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Sigma, User, Briefcase, BookOpen, Home, HeartPulse, FileText, BarChart3,
-  Menu, X, AlertCircle, CheckCircle2, Sparkles, Save, Clock
+  Menu, X, AlertCircle, CheckCircle2, Sparkles, Save, Clock, Cloud
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
@@ -15,6 +15,7 @@ import { DataImport } from './DataImport';
 import { Dashboard } from './Dashboard';
 import { UserMenu } from './UserMenu';
 import { AIAssistant } from './AIAssistant';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import {
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
   DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
@@ -130,18 +131,36 @@ export default function ForensicSuite() {
     }
   });
 
-  // Auto-Save with timestamp tracking
-  const triggerSave = useCallback(() => {
+  // Auto-Save with timestamp tracking (local storage)
+  const triggerLocalSave = useCallback(() => {
     setLastSaved(new Date());
     setSaveIndicatorVisible(true);
     setTimeout(() => setSaveIndicatorVisible(false), 2000);
   }, []);
 
-  useEffect(() => { localStorage.setItem('fs_case_v10', JSON.stringify(caseInfo)); triggerSave(); }, [caseInfo]);
-  useEffect(() => { localStorage.setItem('fs_params_v10', JSON.stringify(earningsParams)); triggerSave(); }, [earningsParams]);
-  useEffect(() => { localStorage.setItem('fs_lcp_v10', JSON.stringify(lcpItems)); triggerSave(); }, [lcpItems]);
-  useEffect(() => { localStorage.setItem('fs_past_actuals_v10', JSON.stringify(pastActuals)); triggerSave(); }, [pastActuals]);
-  useEffect(() => { localStorage.setItem('fs_hhs_v10', JSON.stringify(hhServices)); triggerSave(); }, [hhServices]);
+  useEffect(() => { localStorage.setItem('fs_case_v10', JSON.stringify(caseInfo)); triggerLocalSave(); }, [caseInfo]);
+  useEffect(() => { localStorage.setItem('fs_params_v10', JSON.stringify(earningsParams)); triggerLocalSave(); }, [earningsParams]);
+  useEffect(() => { localStorage.setItem('fs_lcp_v10', JSON.stringify(lcpItems)); triggerLocalSave(); }, [lcpItems]);
+  useEffect(() => { localStorage.setItem('fs_past_actuals_v10', JSON.stringify(pastActuals)); triggerLocalSave(); }, [pastActuals]);
+  useEffect(() => { localStorage.setItem('fs_hhs_v10', JSON.stringify(hhServices)); triggerLocalSave(); }, [hhServices]);
+
+  // Cloud Auto-Save Hook
+  const caseData = useMemo(() => ({
+    caseInfo,
+    earningsParams,
+    hhServices,
+    lcpItems,
+    pastActuals,
+    isUnionMode,
+  }), [caseInfo, earningsParams, hhServices, lcpItems, pastActuals, isUnionMode]);
+
+  const { 
+    activeCaseId, 
+    setActiveCase, 
+    clearActiveCase, 
+    lastAutoSave, 
+    isSaving: isAutoSaving 
+  } = useAutoSave(caseData, { intervalMs: 2 * 60 * 1000 });
 
   // Keyboard Navigation
   useEffect(() => {
@@ -206,7 +225,7 @@ export default function ForensicSuite() {
   }, [caseInfo, earningsParams, hhServices, lcpItems]);
 
   // Case Management Handlers
-  const handleLoadCase = (savedCase: SavedCase) => {
+  const handleLoadCase = useCallback((savedCase: SavedCase) => {
     setCaseInfo(savedCase.caseInfo);
     setEarningsParams(savedCase.earningsParams);
     setHhServices(savedCase.hhServices);
@@ -214,9 +233,23 @@ export default function ForensicSuite() {
     setPastActuals(savedCase.pastActuals);
     setIsUnionMode(savedCase.isUnionMode);
     setCurrentStep(0);
-  };
+    
+    // Set active case for cloud auto-save if it's a cloud case
+    if (savedCase.isCloud && savedCase.id) {
+      setActiveCase(savedCase.id, {
+        caseInfo: savedCase.caseInfo,
+        earningsParams: savedCase.earningsParams,
+        hhServices: savedCase.hhServices,
+        lcpItems: savedCase.lcpItems,
+        pastActuals: savedCase.pastActuals,
+        isUnionMode: savedCase.isUnionMode,
+      });
+    } else {
+      clearActiveCase();
+    }
+  }, [normalizeLcpItems, setActiveCase, clearActiveCase]);
 
-  const handleNewCase = () => {
+  const handleNewCase = useCallback(() => {
     const defaults = getDefaultCaseData();
     setCaseInfo(defaults.caseInfo);
     setEarningsParams(defaults.earningsParams);
@@ -225,7 +258,8 @@ export default function ForensicSuite() {
     setPastActuals(defaults.pastActuals);
     setIsUnionMode(defaults.isUnionMode);
     setCurrentStep(0);
-  };
+    clearActiveCase();
+  }, [normalizeLcpItems, clearActiveCase]);
 
   const dateCalc: DateCalc = useMemo(() => computeDateCalc(caseInfo), [caseInfo]);
 
@@ -442,11 +476,21 @@ export default function ForensicSuite() {
           
           <div className="hidden lg:flex items-center gap-4">
             {/* Auto-save indicator */}
-            <div className={`flex items-center gap-1.5 text-xs transition-all duration-300 ${saveIndicatorVisible ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-              {saveIndicatorVisible ? (
+            <div className={`flex items-center gap-1.5 text-xs transition-all duration-300 ${saveIndicatorVisible || isAutoSaving ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+              {isAutoSaving ? (
+                <>
+                  <Cloud className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Syncing...</span>
+                </>
+              ) : saveIndicatorVisible ? (
                 <>
                   <Save className="w-3.5 h-3.5 animate-pulse" />
                   <span>Saving...</span>
+                </>
+              ) : activeCaseId ? (
+                <>
+                  <Cloud className="w-3.5 h-3.5" />
+                  <span>{lastAutoSave ? `Synced ${formatLastSaved(lastAutoSave)}` : formatLastSaved(lastSaved)}</span>
                 </>
               ) : (
                 <>
@@ -464,6 +508,7 @@ export default function ForensicSuite() {
               onNewCase={handleNewCase}
               onOpenImport={() => setShowImportModal(true)}
               onOpenDashboard={() => setShowDashboard(true)}
+              onCaseSaved={(caseId) => setActiveCase(caseId, caseData)}
             />
             <ExportHistory fmtUSD={fmtUSD} />
             <ThemeToggle />
@@ -495,6 +540,7 @@ export default function ForensicSuite() {
               onNewCase={handleNewCase}
               onOpenImport={() => setShowImportModal(true)}
               onOpenDashboard={() => setShowDashboard(true)}
+              onCaseSaved={(caseId) => setActiveCase(caseId, caseData)}
             />
             <ExportHistory fmtUSD={fmtUSD} />
           </div>

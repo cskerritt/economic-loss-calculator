@@ -32,9 +32,10 @@ interface CaseManagerProps {
   onNewCase: () => void;
   onOpenImport?: () => void;
   onOpenDashboard?: () => void;
+  onCaseSaved?: (caseId: string) => void;
 }
 
-export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCase, onNewCase, onOpenImport, onOpenDashboard }) => {
+export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCase, onNewCase, onOpenImport, onOpenDashboard, onCaseSaved }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -96,7 +97,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
     setSaving(true);
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('cases')
         .insert([{
           user_id: user.id,
@@ -107,14 +108,21 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ currentCase, onLoadCas
           lcp_items: JSON.parse(JSON.stringify(currentCase.lcpItems)),
           past_actuals: JSON.parse(JSON.stringify(currentCase.pastActuals)),
           is_union_mode: currentCase.isUnionMode,
-        }]);
+        }])
+        .select('id')
+        .single();
 
       if (error) throw error;
 
       toast({
         title: 'Case saved',
-        description: 'Your case has been saved to the cloud.',
+        description: 'Your case has been saved to the cloud. Auto-sync is now enabled.',
       });
+
+      // Notify parent about the new case ID for auto-save
+      if (data?.id && onCaseSaved) {
+        onCaseSaved(data.id);
+      }
 
       setSaveName('');
       setShowSaveDialog(false);
