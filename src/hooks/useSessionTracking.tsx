@@ -45,11 +45,16 @@ export function useSessionTracking() {
 
     try {
       // Try to update existing session first
-      const { data: existingSession } = await supabase
+      const { data: existingSession, error: selectError } = await supabase
         .from('user_sessions')
         .select('id')
         .eq('session_token', sessionToken)
-        .single();
+        .maybeSingle();
+
+      if (selectError) {
+        console.error('Failed to check session:', selectError);
+        return;
+      }
 
       if (existingSession) {
         // Update last active time
