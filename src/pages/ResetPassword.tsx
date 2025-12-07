@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Sigma, Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
+import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
@@ -127,7 +128,7 @@ export default function ResetPassword() {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">Must be at least 6 characters</p>
+                <PasswordStrengthIndicator password={password} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
