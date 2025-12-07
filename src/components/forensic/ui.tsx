@@ -77,11 +77,11 @@ export const InputGroup: React.FC<InputGroupProps> = ({
           </div>
         )}
         <input
-          type={type}
+          type={type === 'date' ? 'text' : type}
           step={step}
           value={value}
           disabled={disabled}
-          placeholder={placeholder}
+          placeholder={type === 'date' ? 'YYYY-MM-DD' : placeholder}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           className={`block w-full rounded-lg py-2 focus:ring-2 text-sm border px-3 transition-all bg-background text-foreground ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''} ${hasError || showRequiredIndicator ? 'border-destructive focus:ring-destructive/30 focus:border-destructive' : 'border-border focus:ring-primary/30 focus:border-primary'}`}
