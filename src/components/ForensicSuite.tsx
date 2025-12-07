@@ -17,7 +17,6 @@ import { UserMenu } from './UserMenu';
 import { AIAssistant } from './AIAssistant';
 import { EmailVerificationBanner } from './EmailVerificationBanner';
 import { useAutoSave } from '@/hooks/useAutoSave';
-import { useSessionTracking } from '@/hooks/useSessionTracking';
 import {
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
   DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
@@ -69,8 +68,6 @@ export default function ForensicSuite() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
 
-  // Track user session for session management
-  useSessionTracking();
   const normalizeLcpItems = useCallback((items: LcpItem[] = []): LcpItem[] => {
     return items.map((item) => {
       const startYear = Math.max(1, item.startYear || 1);
