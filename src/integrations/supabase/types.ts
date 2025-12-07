@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      cases: {
+        Row: {
+          case_info: Json
+          created_at: string
+          earnings_params: Json
+          hh_services: Json
+          id: string
+          is_union_mode: boolean
+          lcp_items: Json
+          name: string
+          past_actuals: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          case_info?: Json
+          created_at?: string
+          earnings_params?: Json
+          hh_services?: Json
+          id?: string
+          is_union_mode?: boolean
+          lcp_items?: Json
+          name: string
+          past_actuals?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          case_info?: Json
+          created_at?: string
+          earnings_params?: Json
+          hh_services?: Json
+          id?: string
+          is_union_mode?: boolean
+          lcp_items?: Json
+          name?: string
+          past_actuals?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company: string | null
