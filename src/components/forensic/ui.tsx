@@ -65,10 +65,7 @@ export const InputGroup: React.FC<InputGroupProps> = ({
   const showRequiredIndicator = required && isEmpty;
 
   const formatDateInput = (input: string): string => {
-    // Remove all non-numeric characters
     const digits = input.replace(/\D/g, '');
-    
-    // Build formatted date string with auto-dashes
     let formatted = '';
     for (let i = 0; i < digits.length && i < 8; i++) {
       if (i === 4 || i === 6) {
@@ -79,13 +76,34 @@ export const InputGroup: React.FC<InputGroupProps> = ({
     return formatted;
   };
 
+  const formatNumberInput = (input: string): string => {
+    if (input === '' || input === '-') return input;
+    const cleaned = input.replace(/[^\d.-]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? '' : num.toString();
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (type === 'date') {
       const formatted = formatDateInput(e.target.value);
       onChange(formatted);
+    } else if (type === 'number') {
+      // Allow typing but filter invalid chars except decimal/minus
+      const val = e.target.value.replace(/[^\d.-]/g, '');
+      onChange(val);
     } else {
       onChange(e.target.value);
     }
+  };
+
+  const handleBlur = () => {
+    if (type === 'number') {
+      const formatted = formatNumberInput(String(value));
+      if (formatted !== String(value)) {
+        onChange(formatted);
+      }
+    }
+    onBlur?.();
   };
   
   return (
@@ -101,13 +119,14 @@ export const InputGroup: React.FC<InputGroupProps> = ({
           </div>
         )}
         <input
-          type={type === 'date' ? 'text' : type}
+          type={type === 'number' ? 'text' : (type === 'date' ? 'text' : type)}
+          inputMode={type === 'number' ? 'decimal' : undefined}
           step={step}
           value={value}
           disabled={disabled}
           placeholder={type === 'date' ? 'YYYY-MM-DD' : placeholder}
           onChange={handleChange}
-          onBlur={onBlur}
+          onBlur={handleBlur}
           maxLength={type === 'date' ? 10 : undefined}
           className={`block w-full rounded-lg py-2 focus:ring-2 text-sm border px-3 transition-all bg-background text-foreground ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''} ${hasError || showRequiredIndicator ? 'border-destructive focus:ring-destructive/30 focus:border-destructive' : 'border-border focus:ring-primary/30 focus:border-primary'}`}
         />
