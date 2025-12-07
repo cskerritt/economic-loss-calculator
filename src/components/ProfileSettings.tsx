@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Building } from 'lucide-react';
+import { EmailVerificationStatus } from './EmailVerificationBanner';
 
 interface ProfileSettingsProps {
   open: boolean;
@@ -113,7 +114,10 @@ export function ProfileSettings({ open, onOpenChange }: ProfileSettingsProps) {
                 disabled
                 className="bg-muted"
               />
-              <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                <EmailVerificationStatus />
+              </div>
             </div>
 
             <div className="space-y-2">

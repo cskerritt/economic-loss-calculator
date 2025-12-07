@@ -15,6 +15,7 @@ import { DataImport } from './DataImport';
 import { Dashboard } from './Dashboard';
 import { UserMenu } from './UserMenu';
 import { AIAssistant } from './AIAssistant';
+import { EmailVerificationBanner } from './EmailVerificationBanner';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import {
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
@@ -579,6 +580,7 @@ export default function ForensicSuite() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 print:p-0">
+        <EmailVerificationBanner />
         <div className="print:hidden mb-4 sm:mb-6">
           <div className="bg-muted border border-border rounded-xl p-3 sm:p-4 shadow-sm">
             <div className="flex flex-col gap-3 mb-3">
