@@ -68,8 +68,8 @@ export const InputGroup: React.FC<InputGroupProps> = ({
     const digits = input.replace(/\D/g, '');
     let formatted = '';
     for (let i = 0; i < digits.length && i < 8; i++) {
-      if (i === 4 || i === 6) {
-        formatted += '-';
+      if (i === 2 || i === 4) {
+        formatted += '/';
       }
       formatted += digits[i];
     }
@@ -142,7 +142,7 @@ export const InputGroup: React.FC<InputGroupProps> = ({
           step={step}
           value={displayValue}
           disabled={disabled}
-          placeholder={type === 'date' ? 'YYYY-MM-DD' : placeholder}
+          placeholder={type === 'date' ? 'MM/DD/YYYY' : placeholder}
           onChange={handleChange}
           onBlur={handleBlur}
           maxLength={type === 'date' ? 10 : undefined}
