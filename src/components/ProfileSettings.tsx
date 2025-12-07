@@ -8,7 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Building } from 'lucide-react';
 import { EmailVerificationStatus } from './EmailVerificationBanner';
-
+import { SessionManager } from './SessionManager';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 interface ProfileSettingsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -92,71 +94,83 @@ export function ProfileSettings({ open, onOpenChange }: ProfileSettingsProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>Profile Settings</DialogTitle>
-          <DialogDescription>Update your personal information</DialogDescription>
+          <DialogDescription>Manage your account and security</DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-2">
-                Email
-              </Label>
-              <Input
-                id="email"
-                value={user?.email || ''}
-                disabled
-                className="bg-muted"
-              />
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                <EmailVerificationStatus />
+        <ScrollArea className="max-h-[calc(85vh-120px)] pr-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-6 py-4">
+              {/* Profile Section */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground">Profile Information</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-2">
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-muted"
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                    <EmailVerificationStatus />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="full_name" className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Full Name
+                  </Label>
+                  <Input
+                    id="full_name"
+                    value={profile.full_name || ''}
+                    onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                    placeholder="John Smith"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="company" className="flex items-center gap-2">
+                    <Building className="w-4 h-4" />
+                    Company / Firm
+                  </Label>
+                  <Input
+                    id="company"
+                    value={profile.company || ''}
+                    onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                    placeholder="Smith Economics, LLC"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSave} disabled={saving}>
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Save Changes
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="full_name" className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Full Name
-              </Label>
-              <Input
-                id="full_name"
-                value={profile.full_name || ''}
-                onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                placeholder="John Smith"
-              />
-            </div>
+              <Separator />
 
-            <div className="space-y-2">
-              <Label htmlFor="company" className="flex items-center gap-2">
-                <Building className="w-4 h-4" />
-                Company / Firm
-              </Label>
-              <Input
-                id="company"
-                value={profile.company || ''}
-                onChange={(e) => setProfile({ ...profile, company: e.target.value })}
-                placeholder="Smith Economics, LLC"
-              />
+              {/* Session Management Section */}
+              <SessionManager />
             </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        )}
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
