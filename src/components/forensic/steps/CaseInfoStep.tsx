@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { User, Scale, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { Card, SectionHeader, InputGroup } from '../ui';
 import { CaseInfo, DateCalc } from '../types';
+import { parseDate } from '../calculations';
 
 interface CaseInfoStepProps {
   caseInfo: CaseInfo;
@@ -36,9 +37,9 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
     if (!caseInfo.dob) {
       errors.dob = 'Date of birth is required';
     } else {
-      const dobDate = new Date(caseInfo.dob);
+      const dobDate = parseDate(caseInfo.dob);
       if (isNaN(dobDate.getTime())) {
-        errors.dob = 'Invalid date format';
+        errors.dob = 'Invalid date format (use MM/DD/YYYY)';
       } else if (dobDate > new Date()) {
         errors.dob = 'Date of birth cannot be in the future';
       }
@@ -47,20 +48,20 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
     if (!caseInfo.dateOfInjury) {
       errors.dateOfInjury = 'Date of injury is required';
     } else {
-      const injuryDate = new Date(caseInfo.dateOfInjury);
+      const injuryDate = parseDate(caseInfo.dateOfInjury);
       if (isNaN(injuryDate.getTime())) {
-        errors.dateOfInjury = 'Invalid date format';
+        errors.dateOfInjury = 'Invalid date format (use MM/DD/YYYY)';
       }
     }
     
     if (!caseInfo.dateOfTrial) {
       errors.dateOfTrial = 'Trial/valuation date is required';
     } else {
-      const trialDate = new Date(caseInfo.dateOfTrial);
+      const trialDate = parseDate(caseInfo.dateOfTrial);
       if (isNaN(trialDate.getTime())) {
-        errors.dateOfTrial = 'Invalid date format';
+        errors.dateOfTrial = 'Invalid date format (use MM/DD/YYYY)';
       } else if (caseInfo.dateOfInjury) {
-        const injuryDate = new Date(caseInfo.dateOfInjury);
+        const injuryDate = parseDate(caseInfo.dateOfInjury);
         if (trialDate < injuryDate) {
           errors.dateOfTrial = 'Trial date must be after injury date';
         }

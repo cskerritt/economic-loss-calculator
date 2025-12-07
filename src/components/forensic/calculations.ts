@@ -13,14 +13,29 @@ import {
 
 const MS_PER_YEAR = 1000 * 60 * 60 * 24 * 365.25;
 
+// Parse date from MM/DD/YYYY format (or fallback to ISO format for backwards compatibility)
+export function parseDate(dateStr: string): Date {
+  if (!dateStr) return new Date(NaN);
+  
+  // Check for MM/DD/YYYY format
+  const slashMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  
+  // Fallback to ISO format (YYYY-MM-DD) for backwards compatibility
+  return new Date(dateStr);
+}
+
 export function computeDateCalc(caseInfo: CaseInfo, today: Date = new Date()): DateCalc {
   if (!caseInfo.dob || !caseInfo.dateOfInjury || !caseInfo.dateOfTrial) {
     return { ageInjury: "0", ageTrial: "0", currentAge: "0", pastYears: 0, derivedYFS: 0 };
   }
 
-  const dob = new Date(caseInfo.dob);
-  const doi = new Date(caseInfo.dateOfInjury);
-  const dot = new Date(caseInfo.dateOfTrial);
+  const dob = parseDate(caseInfo.dob);
+  const doi = parseDate(caseInfo.dateOfInjury);
+  const dot = parseDate(caseInfo.dateOfTrial);
 
   const getAge = (d: Date) => (d.getTime() - dob.getTime()) / MS_PER_YEAR;
   const pastYears = Math.max(0, (dot.getTime() - doi.getTime()) / MS_PER_YEAR);
@@ -105,7 +120,7 @@ export function computeProjection(
     return { pastSchedule, futureSchedule, totalPastLoss, totalFutureNominal, totalFuturePV };
   }
 
-  const startYear = new Date(caseInfo.dateOfInjury).getFullYear();
+  const startYear = parseDate(caseInfo.dateOfInjury).getFullYear();
   const fullPast = Math.floor(dateCalc.pastYears);
   const partialPast = dateCalc.pastYears % 1;
 
@@ -236,8 +251,8 @@ export function computeLcpData(lcpItems: LcpItem[], discountRate: number): LcpDa
 
 export function computeAgeAtInjury(caseInfo: CaseInfo): number {
   if (!caseInfo.dob || !caseInfo.dateOfInjury) return 0;
-  const dobDate = new Date(caseInfo.dob);
-  const injuryDate = new Date(caseInfo.dateOfInjury);
+  const dobDate = parseDate(caseInfo.dob);
+  const injuryDate = parseDate(caseInfo.dateOfInjury);
   return (injuryDate.getTime() - dobDate.getTime()) / MS_PER_YEAR;
 }
 
@@ -296,7 +311,7 @@ export function computeScenarioProjections({
     const realizedMultiplier = afterTaxFactor * fringeFactor;
 
     let totalPastLoss = 0;
-    const startYear = new Date(caseInfo.dateOfInjury!).getFullYear();
+    const startYear = parseDate(caseInfo.dateOfInjury!).getFullYear();
     const fullPast = Math.floor(dateCalc.pastYears);
     const partialPast = dateCalc.pastYears % 1;
 

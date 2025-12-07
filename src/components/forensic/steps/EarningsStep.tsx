@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { Briefcase, TrendingUp, HeartPulse, History, Calendar, Target, AlertCircle } from 'lucide-react';
 import { Card, SectionHeader, InputGroup } from '../ui';
 import { EarningsParams, DateCalc, Algebraic, RETIREMENT_SCENARIOS } from '../types';
+import { parseDate } from '../calculations';
 
 interface RetirementScenarioCalc {
   id: string;
@@ -89,7 +90,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
   const errors = validate();
   const hasErrors = Object.keys(errors).length > 0;
 
-  const startYear = dateOfInjury ? new Date(dateOfInjury).getFullYear() : new Date().getFullYear();
+  const startYear = dateOfInjury ? parseDate(dateOfInjury).getFullYear() : new Date().getFullYear();
   const fullPast = Math.floor(dateCalc.pastYears);
   const applyRecommendedEconomic = useCallback(() => {
     setEarningsParams(prev => ({
@@ -107,8 +108,8 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
   // Calculate age at injury (with NaN protection)
   const ageAtInjury = useMemo(() => {
     if (!dob || !dateOfInjury) return 0;
-    const dobDate = new Date(dob);
-    const injuryDate = new Date(dateOfInjury);
+    const dobDate = parseDate(dob);
+    const injuryDate = parseDate(dateOfInjury);
     if (isNaN(dobDate.getTime()) || isNaN(injuryDate.getTime())) return 0;
     const age = (injuryDate.getTime() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
     return isNaN(age) ? 0 : age;
