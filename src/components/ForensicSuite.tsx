@@ -14,6 +14,7 @@ import { ExportHistory, addExportRecord } from './ExportHistory';
 import { DataImport } from './DataImport';
 import { Dashboard } from './Dashboard';
 import { UserMenu } from './UserMenu';
+import { AIAssistant } from './AIAssistant';
 import {
   CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection,
   DEFAULT_CASE_INFO, DEFAULT_EARNINGS_PARAMS, DEFAULT_HH_SERVICES
@@ -384,7 +385,7 @@ export default function ForensicSuite() {
       case 'earnings':
         return <EarningsStep earningsParams={earningsParams} setEarningsParams={setEarningsParams} dateCalc={dateCalc} algebraic={algebraic} workLifeFactor={workLifeFactor} isUnionMode={isUnionMode} setIsUnionMode={setIsUnionMode} pastActuals={pastActuals} setPastActuals={setPastActuals} dateOfInjury={caseInfo.dateOfInjury} dob={caseInfo.dob} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
       case 'narratives':
-        return <NarrativesStep caseInfo={caseInfo} setCaseInfo={setCaseInfo} />;
+        return <NarrativesStep caseInfo={caseInfo} setCaseInfo={setCaseInfo} earningsParams={earningsParams} />;
       case 'household':
         return <HouseholdStep hhServices={hhServices} setHhServices={setHhServices} hhsData={hhsData} fmtUSD={fmtUSD} />;
       case 'lcp':
@@ -608,6 +609,9 @@ export default function ForensicSuite() {
           fmtUSD={fmtUSD}
         />
       )}
+
+      {/* AI Assistant */}
+      <AIAssistant />
     </div>
   );
 }
