@@ -80,10 +80,10 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
   const requiredFieldsComplete = !errors.plaintiff && !errors.dob && !errors.dateOfInjury && !errors.dateOfTrial;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Case Information</h2>
-        <p className="text-muted-foreground mt-1">Enter the basic case details and plaintiff demographics</p>
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 animate-fade-in px-2 sm:px-0">
+      <div className="text-center mb-4 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Case Information</h2>
+        <p className="text-sm text-muted-foreground mt-1">Enter the basic case details and plaintiff demographics</p>
         {hasErrors && Object.keys(touched).length > 0 && (
           <div className="mt-3 inline-flex items-center gap-2 text-destructive text-sm bg-destructive/10 px-3 py-1.5 rounded-lg">
             <AlertCircle className="w-4 h-4" />
@@ -92,12 +92,12 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Demographics */}
-        <Card className="p-5 border-l-4 border-l-indigo">
+        <Card className="p-4 sm:p-5 border-l-4 border-l-indigo">
           <SectionHeader icon={User} title="Plaintiff Demographics" subtitle="Personal Information" />
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <InputGroup 
                 label="Plaintiff Name" 
                 type="text" 
@@ -110,7 +110,7 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
               />
               <InputGroup label="File Number" type="text" value={caseInfo.fileNumber} onChange={v => setCaseInfo({...caseInfo, fileNumber: v})} placeholder="KW-2025-XXX" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <InputGroup label="Gender" type="text" value={caseInfo.gender} onChange={v => setCaseInfo({...caseInfo, gender: v})} placeholder="Male/Female" />
               <InputGroup 
                 label="Date of Birth" 
@@ -134,10 +134,10 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
         </Card>
 
         {/* Legal Framework */}
-        <Card className="p-5 border-l-4 border-l-sky">
+        <Card className="p-4 sm:p-5 border-l-4 border-l-sky">
           <SectionHeader icon={Scale} title="Legal Framework" subtitle="Jurisdiction & Retaining Party" />
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <InputGroup label="Jurisdiction" type="text" value={caseInfo.jurisdiction} onChange={v => setCaseInfo({...caseInfo, jurisdiction: v})} placeholder="State/Federal" />
               <InputGroup label="Case Type" type="text" value={caseInfo.caseType} onChange={v => setCaseInfo({...caseInfo, caseType: v})} placeholder="Personal Injury, WC, etc." />
             </div>
@@ -148,10 +148,10 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
         </Card>
 
         {/* Key Dates */}
-        <Card className="p-5 border-l-4 border-l-amber-500">
+        <Card className="p-4 sm:p-5 border-l-4 border-l-amber-500">
           <SectionHeader icon={CalendarIcon} title="Key Dates" subtitle="Injury & Valuation Timeline" />
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <InputGroup 
                 label="Date of Injury" 
                 type="date" 
@@ -174,20 +174,20 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
             <InputGroup label="Retirement Age" value={caseInfo.retirementAge} onChange={v => setCaseInfo({...caseInfo, retirementAge: parseInt(v) || 67})} suffix="years" />
             
             {/* Calculated Ages */}
-            <div className="bg-muted rounded-lg p-3 mt-3">
-              <h4 className="text-[10px] font-bold uppercase text-muted-foreground mb-2">Calculated Values</h4>
+            <div className="bg-muted rounded-lg p-3 mt-2 sm:mt-3">
+              <h4 className="text-[10px] sm:text-[11px] font-bold uppercase text-muted-foreground mb-2">Calculated Values</h4>
               <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="text-center">
+                <div className="text-center p-2 bg-background rounded-lg">
                   <span className="block text-muted-foreground text-[10px]">Current Age</span>
-                  <span className="font-bold text-foreground">{dateCalc.currentAge}</span>
+                  <span className="font-bold text-foreground text-base">{dateCalc.currentAge}</span>
                 </div>
-                <div className="text-center">
+                <div className="text-center p-2 bg-background rounded-lg">
                   <span className="block text-muted-foreground text-[10px]">Age at Injury</span>
-                  <span className="font-bold text-foreground">{dateCalc.ageInjury}</span>
+                  <span className="font-bold text-foreground text-base">{dateCalc.ageInjury}</span>
                 </div>
-                <div className="text-center">
+                <div className="text-center p-2 bg-background rounded-lg">
                   <span className="block text-muted-foreground text-[10px]">Age at Trial</span>
-                  <span className="font-bold text-foreground">{dateCalc.ageTrial}</span>
+                  <span className="font-bold text-foreground text-base">{dateCalc.ageTrial}</span>
                 </div>
               </div>
             </div>
@@ -195,9 +195,9 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
         </Card>
 
         {/* Actuarial Sources */}
-        <Card className="p-5 border-l-4 border-l-emerald">
+        <Card className="p-4 sm:p-5 border-l-4 border-l-emerald">
           <SectionHeader icon={User} title="Actuarial Data" subtitle="Life & Work Expectancy Sources" />
-          <div className="space-y-2">
+          <div className="space-y-1">
             <InputGroup 
               label="Life Expectancy" 
               value={caseInfo.lifeExpectancy} 
@@ -215,7 +215,7 @@ export const CaseInfoStep: React.FC<CaseInfoStepProps> = ({ caseInfo, setCaseInf
 
       {/* Validation Summary */}
       {!requiredFieldsComplete && Object.keys(touched).length > 0 && (
-        <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4">
+        <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 sm:p-4">
           <h4 className="text-sm font-bold text-destructive flex items-center gap-2 mb-2">
             <AlertCircle className="w-4 h-4" />
             Required Fields Missing
