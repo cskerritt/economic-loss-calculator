@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Table, Copy, Check, Target, BarChart3, TrendingUp, ChevronDown, ChevronRight, HeartPulse, Home } from 'lucide-react';
+import { Table, Copy, Check, Target, BarChart3, TrendingUp, ChevronDown, ChevronRight, HeartPulse, Home, Download, FileSpreadsheet } from 'lucide-react';
 import { Card } from '../ui';
 import { Projection, HhServices, HhsData, LcpData, Algebraic, ScenarioProjection, CaseInfo, EarningsParams, LcpItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList, LineChart, Line, Legend, AreaChart, Area } from 'recharts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ScenarioCardView } from '../ScenarioCardView';
 import {
   computeDetailedScenarioSchedule,
   computeDetailedLcpSchedule,
@@ -13,6 +16,12 @@ import {
   DetailedLcpScheduleRow,
   DetailedHhsScheduleRow,
 } from '../calculations';
+import {
+  exportEarningsScheduleToCsv,
+  exportLcpScheduleToCsv,
+  exportHouseholdScheduleToCsv,
+  exportScenarioComparisonToCsv
+} from '../csvExport';
 
 interface SummaryStepProps {
   projection: Projection;
@@ -55,6 +64,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   baseCalendarYear,
   ageAtInjury
 }) => {
+  const isMobile = useIsMobile();
   const [copySuccess, setCopySuccess] = useState('');
   const [openScenarioSchedules, setOpenScenarioSchedules] = useState<Record<string, boolean>>({});
   const [lcpScheduleOpen, setLcpScheduleOpen] = useState(false);
@@ -62,7 +72,21 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   const [scenarioTableOpen, setScenarioTableOpen] = useState(true);
   const [damageScheduleOpen, setDamageScheduleOpen] = useState(true);
   const [chartsOpen, setChartsOpen] = useState(true);
+  const [showMobileCards, setShowMobileCards] = useState(true);
   const activeScenario = scenarioProjections.find((s) => s.id === selectedScenario);
+
+  // CSV export params object
+  const csvExportParams = useMemo(() => ({
+    caseInfo,
+    earningsParams,
+    hhServices,
+    lcpItems,
+    algebraic,
+    scenarioProjections,
+    isUnionMode,
+    baseCalendarYear,
+    ageAtInjury
+  }), [caseInfo, earningsParams, hhServices, lcpItems, algebraic, scenarioProjections, isUnionMode, baseCalendarYear, ageAtInjury]);
 
   // Compute detailed schedules for each scenario
   const scenarioSchedules = useMemo(() => {
@@ -285,100 +309,181 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead className="bg-muted text-muted-foreground">
-                      <tr>
-                        <th className="p-3 text-center font-bold w-12">Include</th>
-                        <th className="p-3 text-left font-bold">Scenario</th>
-                        <th className="p-3 text-right font-bold hidden md:table-cell">Ret. Age</th>
-                        <th className="p-3 text-right font-bold hidden md:table-cell">YFS</th>
-                        <th className="p-3 text-right font-bold hidden lg:table-cell">WLF</th>
-                        <th className="p-3 text-right font-bold hidden lg:table-cell">Past Loss</th>
-                        <th className="p-3 text-right font-bold hidden md:table-cell">Future (PV)</th>
-                        <th className="p-3 text-right font-bold hidden lg:table-cell">Earnings Total</th>
-                        <th className="p-3 text-right font-bold bg-primary/10">Grand Total</th>
-                        <th className="p-3 text-center font-bold">YOY</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {scenarioProjections.map(scenario => (
-                        <React.Fragment key={scenario.id}>
-                          <tr className={scenario.id === selectedScenario ? 'bg-primary/10' : 'hover:bg-muted/50'}>
-                            <td className="p-3 text-center">
-                              <Checkbox
-                                checked={scenario.included}
-                                onCheckedChange={() => onToggleScenarioIncluded(scenario.id)}
-                                className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
-                              />
-                            </td>
-                            <td className="p-3 text-left">
-                              <span className={scenario.id === selectedScenario ? 'font-bold text-primary' : ''}>
-                                {scenario.label}
-                              </span>
-                              {scenario.id === selectedScenario && (
-                                <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
-                              )}
-                            </td>
-                            <td className="p-3 text-right font-mono hidden md:table-cell">{scenario.retirementAge.toFixed(1)}</td>
-                            <td className="p-3 text-right font-mono hidden md:table-cell">{scenario.yfs.toFixed(2)}</td>
-                            <td className="p-3 text-right font-mono hidden lg:table-cell">{scenario.wlfPercent.toFixed(2)}%</td>
-                            <td className="p-3 text-right font-mono hidden lg:table-cell">{fmtUSD(scenario.totalPastLoss)}</td>
-                            <td className="p-3 text-right font-mono hidden md:table-cell">{fmtUSD(scenario.totalFuturePV)}</td>
-                            <td className="p-3 text-right font-mono font-bold hidden lg:table-cell">{fmtUSD(scenario.totalEarningsLoss)}</td>
-                            <td className="p-3 text-right font-mono font-bold text-primary bg-primary/5">{fmtUSD(scenario.grandTotal)}</td>
-                            <td className="p-3 text-center">
-                              <button
-                                onClick={() => toggleScenarioSchedule(scenario.id)}
-                                className="text-xs text-primary hover:underline flex items-center gap-1 mx-auto"
-                              >
-                                {openScenarioSchedules[scenario.id] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                <span className="hidden sm:inline">View</span>
-                              </button>
-                            </td>
-                          </tr>
-                          {openScenarioSchedules[scenario.id] && (
-                            <tr>
-                              <td colSpan={10} className="p-0">
-                                <div className="bg-muted/50 p-4 border-t border-border">
-                                  <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">
-                                    Year-Over-Year Schedule: {scenario.label}
-                                  </h4>
-                                  <div className="overflow-x-auto max-h-[300px]">
-                                    <table className="w-full text-xs border-collapse">
-                                      <thead className="bg-background sticky top-0">
-                                        <tr>
-                                          <th className="p-2 text-left border border-border">Year #</th>
-                                          <th className="p-2 text-left border border-border">Calendar Year</th>
-                                          <th className="p-2 text-right border border-border">Gross Earnings</th>
-                                          <th className="p-2 text-right border border-border">Net Loss</th>
-                                          <th className="p-2 text-right border border-border">Present Value</th>
-                                          <th className="p-2 text-right border border-border">Cumulative PV</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {scenarioSchedules[scenario.id]?.map((row) => (
-                                          <tr key={row.yearNum} className="hover:bg-background/50">
-                                            <td className="p-2 border border-border">{row.yearNum}</td>
-                                            <td className="p-2 border border-border">{row.calendarYear}</td>
-                                            <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.grossEarnings)}</td>
-                                            <td className="p-2 text-right border border-border font-mono text-primary">{fmtUSD(row.netLoss)}</td>
-                                            <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.presentValue)}</td>
-                                            <td className="p-2 text-right border border-border font-mono font-bold">{fmtUSD(row.cumPV)}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
+                {/* CSV Export & View Toggle Toolbar */}
+                <div className="p-3 bg-background border-b border-border flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportScenarioComparisonToCsv(csvExportParams)}
+                      className="h-8 text-xs"
+                    >
+                      <FileSpreadsheet className="w-3 h-3 mr-1" />
+                      Export CSV
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportEarningsScheduleToCsv(csvExportParams)}
+                      className="h-8 text-xs"
+                    >
+                      <Download className="w-3 h-3 mr-1" />
+                      YOY CSV
+                    </Button>
+                  </div>
+                  {isMobile && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowMobileCards(!showMobileCards)}
+                      className="h-8 text-xs"
+                    >
+                      {showMobileCards ? 'Table View' : 'Card View'}
+                    </Button>
+                  )}
+                </div>
+
+                {/* Mobile Card View */}
+                {isMobile && showMobileCards ? (
+                  <div className="p-4">
+                    <ScenarioCardView
+                      scenarioProjections={scenarioProjections}
+                      selectedScenario={selectedScenario}
+                      onToggleScenarioIncluded={onToggleScenarioIncluded}
+                      onViewSchedule={toggleScenarioSchedule}
+                      openSchedules={openScenarioSchedules}
+                      fmtUSD={fmtUSD}
+                    />
+                    {/* Expanded YOY schedules for mobile */}
+                    {scenarioProjections.map(scenario => (
+                      openScenarioSchedules[scenario.id] && (
+                        <div key={`${scenario.id}-schedule`} className="mt-3 bg-muted/50 rounded-lg p-3 border border-border">
+                          <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">
+                            {scenario.label} - Year-Over-Year
+                          </h4>
+                          <div className="overflow-x-auto max-h-[250px]">
+                            <table className="w-full text-[10px] border-collapse">
+                              <thead className="bg-background sticky top-0">
+                                <tr>
+                                  <th className="p-1.5 text-left border border-border">Yr</th>
+                                  <th className="p-1.5 text-right border border-border">Gross</th>
+                                  <th className="p-1.5 text-right border border-border">Net</th>
+                                  <th className="p-1.5 text-right border border-border">PV</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {scenarioSchedules[scenario.id]?.map((row) => (
+                                  <tr key={row.yearNum}>
+                                    <td className="p-1.5 border border-border">{row.calendarYear}</td>
+                                    <td className="p-1.5 text-right border border-border font-mono">{fmtUSD(row.grossEarnings)}</td>
+                                    <td className="p-1.5 text-right border border-border font-mono text-primary">{fmtUSD(row.netLoss)}</td>
+                                    <td className="p-1.5 text-right border border-border font-mono">{fmtUSD(row.presentValue)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                ) : (
+                  /* Desktop Table View */
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead className="bg-muted text-muted-foreground">
+                        <tr>
+                          <th className="p-3 text-center font-bold w-12">Include</th>
+                          <th className="p-3 text-left font-bold">Scenario</th>
+                          <th className="p-3 text-right font-bold hidden md:table-cell">Ret. Age</th>
+                          <th className="p-3 text-right font-bold hidden md:table-cell">YFS</th>
+                          <th className="p-3 text-right font-bold hidden lg:table-cell">WLF</th>
+                          <th className="p-3 text-right font-bold hidden lg:table-cell">Past Loss</th>
+                          <th className="p-3 text-right font-bold hidden md:table-cell">Future (PV)</th>
+                          <th className="p-3 text-right font-bold hidden lg:table-cell">Earnings Total</th>
+                          <th className="p-3 text-right font-bold bg-primary/10">Grand Total</th>
+                          <th className="p-3 text-center font-bold">YOY</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {scenarioProjections.map(scenario => (
+                          <React.Fragment key={scenario.id}>
+                            <tr className={scenario.id === selectedScenario ? 'bg-primary/10' : 'hover:bg-muted/50'}>
+                              <td className="p-3 text-center">
+                                <Checkbox
+                                  checked={scenario.included}
+                                  onCheckedChange={() => onToggleScenarioIncluded(scenario.id)}
+                                  className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                                />
+                              </td>
+                              <td className="p-3 text-left">
+                                <span className={scenario.id === selectedScenario ? 'font-bold text-primary' : ''}>
+                                  {scenario.label}
+                                </span>
+                                {scenario.id === selectedScenario && (
+                                  <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
+                                )}
+                              </td>
+                              <td className="p-3 text-right font-mono hidden md:table-cell">{scenario.retirementAge.toFixed(1)}</td>
+                              <td className="p-3 text-right font-mono hidden md:table-cell">{scenario.yfs.toFixed(2)}</td>
+                              <td className="p-3 text-right font-mono hidden lg:table-cell">{scenario.wlfPercent.toFixed(2)}%</td>
+                              <td className="p-3 text-right font-mono hidden lg:table-cell">{fmtUSD(scenario.totalPastLoss)}</td>
+                              <td className="p-3 text-right font-mono hidden md:table-cell">{fmtUSD(scenario.totalFuturePV)}</td>
+                              <td className="p-3 text-right font-mono font-bold hidden lg:table-cell">{fmtUSD(scenario.totalEarningsLoss)}</td>
+                              <td className="p-3 text-right font-mono font-bold text-primary bg-primary/5">{fmtUSD(scenario.grandTotal)}</td>
+                              <td className="p-3 text-center">
+                                <button
+                                  onClick={() => toggleScenarioSchedule(scenario.id)}
+                                  className="text-xs text-primary hover:underline flex items-center gap-1 mx-auto"
+                                >
+                                  {openScenarioSchedules[scenario.id] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                  <span className="hidden sm:inline">View</span>
+                                </button>
                               </td>
                             </tr>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                            {openScenarioSchedules[scenario.id] && (
+                              <tr>
+                                <td colSpan={10} className="p-0">
+                                  <div className="bg-muted/50 p-4 border-t border-border">
+                                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">
+                                      Year-Over-Year Schedule: {scenario.label}
+                                    </h4>
+                                    <div className="overflow-x-auto max-h-[300px]">
+                                      <table className="w-full text-xs border-collapse">
+                                        <thead className="bg-background sticky top-0">
+                                          <tr>
+                                            <th className="p-2 text-left border border-border">Year #</th>
+                                            <th className="p-2 text-left border border-border">Calendar Year</th>
+                                            <th className="p-2 text-right border border-border">Gross Earnings</th>
+                                            <th className="p-2 text-right border border-border">Net Loss</th>
+                                            <th className="p-2 text-right border border-border">Present Value</th>
+                                            <th className="p-2 text-right border border-border">Cumulative PV</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {scenarioSchedules[scenario.id]?.map((row) => (
+                                            <tr key={row.yearNum} className="hover:bg-background/50">
+                                              <td className="p-2 border border-border">{row.yearNum}</td>
+                                              <td className="p-2 border border-border">{row.calendarYear}</td>
+                                              <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.grossEarnings)}</td>
+                                              <td className="p-2 text-right border border-border font-mono text-primary">{fmtUSD(row.netLoss)}</td>
+                                              <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.presentValue)}</td>
+                                              <td className="p-2 text-right border border-border font-mono font-bold">{fmtUSD(row.cumPV)}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
                   <strong>Note:</strong> Grand Total includes earnings loss, household services (if enabled), and life care plan costs. Only checked scenarios will appear in the exported report.
                 </div>
@@ -500,6 +605,18 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="p-4">
+                {/* CSV Export Button */}
+                <div className="flex justify-end mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportLcpScheduleToCsv(csvExportParams)}
+                    className="h-8 text-xs"
+                  >
+                    <FileSpreadsheet className="w-3 h-3 mr-1" />
+                    Export LCP CSV
+                  </Button>
+                </div>
                 {/* LCP Chart */}
                 <div className="h-[200px] mb-4">
                   <ResponsiveContainer width="100%" height="100%">
@@ -568,7 +685,21 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="p-4 overflow-x-auto max-h-[400px]">
+              <div className="p-4">
+                {/* CSV Export Button */}
+                <div className="flex justify-end mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportHouseholdScheduleToCsv(csvExportParams)}
+                    className="h-8 text-xs"
+                  >
+                    <FileSpreadsheet className="w-3 h-3 mr-1" />
+                    Export Household CSV
+                  </Button>
+                </div>
+              </div>
+              <div className="px-4 pb-4 overflow-x-auto max-h-[400px]">
                 <table className="w-full text-xs border-collapse">
                   <thead className="bg-muted sticky top-0">
                     <tr>
