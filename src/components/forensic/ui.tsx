@@ -79,6 +79,10 @@ export const InputGroup: React.FC<InputGroupProps> = ({
   const formatNumberInput = (input: string): string => {
     if (input === '' || input === '-') return input;
     const cleaned = input.replace(/[^\d.-]/g, '');
+    // Preserve trailing decimal point and zeros during input
+    if (cleaned.endsWith('.') || /\.\d*0$/.test(cleaned)) {
+      return cleaned;
+    }
     const num = parseFloat(cleaned);
     return isNaN(num) ? '' : num.toString();
   };

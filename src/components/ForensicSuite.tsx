@@ -4,7 +4,6 @@ import {
   Menu, X, AlertCircle, CheckCircle2, Sparkles, Save, Clock, Cloud
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
-import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 
 import { WizardNavigation, WizardStep, StepCompletion } from './forensic/WizardNavigation';
@@ -391,22 +390,376 @@ export default function ForensicSuite() {
   const handleExportWord = useCallback(async () => {
     setIsExportingWord(true);
     try {
+      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, HeadingLevel } = await import('docx');
+      
+      const formatDate = (dateStr: string) => {
+        if (!dateStr) return '[Date]';
+        return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      };
+      
+      const createBorderedCell = (text: string, options: { bold?: boolean; alignment?: typeof AlignmentType[keyof typeof AlignmentType] } = {}) => {
+        return new TableCell({
+          children: [new Paragraph({ 
+            children: [new TextRun({ text, bold: options.bold, size: 20 })],
+            alignment: options.alignment || AlignmentType.LEFT
+          })],
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 1 },
+            bottom: { style: BorderStyle.SINGLE, size: 1 },
+            left: { style: BorderStyle.SINGLE, size: 1 },
+            right: { style: BorderStyle.SINGLE, size: 1 },
+          }
+        });
+      };
+
+      // Opinion of Economic Losses Table
+      const lossSummaryRows = [
+        new TableRow({
+          children: [
+            createBorderedCell('Category', { bold: true }),
+            createBorderedCell('Past Value', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Future (PV)', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Total', { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('Lost Earning Capacity'),
+            createBorderedCell(fmtUSD(projection.totalPastLoss), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(projection.totalFuturePV), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(projection.totalPastLoss + projection.totalFuturePV), { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+      ];
+
+      if (hhServices.active) {
+        lossSummaryRows.push(new TableRow({
+          children: [
+            createBorderedCell('Household Services'),
+            createBorderedCell('—', { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(hhsData.totalPV), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(hhsData.totalPV), { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+      }
+
+      if (lcpItems.length > 0) {
+        lossSummaryRows.push(new TableRow({
+          children: [
+            createBorderedCell('Life Care Plan'),
+            createBorderedCell('—', { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(lcpData.totalPV), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(lcpData.totalPV), { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+      }
+
+      lossSummaryRows.push(new TableRow({
+        children: [
+          createBorderedCell('GRAND TOTAL', { bold: true }),
+          createBorderedCell(fmtUSD(projection.totalPastLoss), { bold: true, alignment: AlignmentType.RIGHT }),
+          createBorderedCell(fmtUSD(projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV), { bold: true, alignment: AlignmentType.RIGHT }),
+          createBorderedCell(fmtUSD(grandTotal), { bold: true, alignment: AlignmentType.RIGHT }),
+        ]
+      }));
+
+      // AEF Table
+      const aefRows = [
+        new TableRow({
+          children: [
+            createBorderedCell('Component', { bold: true }),
+            createBorderedCell('Value', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Cumulative', { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('Work Life Factor (WLE/YFS)'),
+            createBorderedCell(algebraic.wlf.toFixed(4), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(algebraic.wlf.toFixed(4), { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('Net Unemployment Factor'),
+            createBorderedCell(algebraic.unempFactor.toFixed(4), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell((algebraic.wlf * algebraic.unempFactor).toFixed(4), { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('After-Tax Factor'),
+            createBorderedCell(algebraic.afterTaxFactor.toFixed(4), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell((algebraic.wlf * algebraic.unempFactor * algebraic.afterTaxFactor).toFixed(4), { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('Fringe Benefit Factor'),
+            createBorderedCell(algebraic.fringeFactor.toFixed(4), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(algebraic.fullMultiplier.toFixed(5), { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+      ];
+
+      // Earnings Schedule Table
+      const earningsScheduleRows = [
+        new TableRow({
+          children: [
+            createBorderedCell('Year', { bold: true }),
+            createBorderedCell('Gross Earnings', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Net Loss', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Present Value', { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+      ];
+
+      // Add past schedule
+      for (const row of projection.pastSchedule) {
+        earningsScheduleRows.push(new TableRow({
+          children: [
+            createBorderedCell(`${row.year} (Past)`),
+            createBorderedCell(fmtUSD(row.grossBase), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(row.netLoss), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell('—', { alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+      }
+
+      // Add future schedule
+      for (const row of projection.futureSchedule) {
+        earningsScheduleRows.push(new TableRow({
+          children: [
+            createBorderedCell(`Year ${row.year}`),
+            createBorderedCell(fmtUSD(row.gross), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(row.netLoss), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(row.pv), { alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+      }
+
+      // Add totals row
+      earningsScheduleRows.push(new TableRow({
+        children: [
+          createBorderedCell('TOTALS', { bold: true }),
+          createBorderedCell('—', { alignment: AlignmentType.RIGHT }),
+          createBorderedCell(fmtUSD(projection.totalPastLoss + projection.totalFutureNominal), { bold: true, alignment: AlignmentType.RIGHT }),
+          createBorderedCell(fmtUSD(projection.totalPastLoss + projection.totalFuturePV), { bold: true, alignment: AlignmentType.RIGHT }),
+        ]
+      }));
+
+      // Scenario Comparison Table
+      const includedScenarios = scenarioProjectionsWithIncluded.filter(s => s.included);
+      const scenarioRows = [
+        new TableRow({
+          children: [
+            createBorderedCell('Scenario', { bold: true }),
+            createBorderedCell('Ret. Age', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('YFS', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('WLF', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Past Loss', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Future PV', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Grand Total', { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+      ];
+
+      for (const scenario of includedScenarios) {
+        scenarioRows.push(new TableRow({
+          children: [
+            createBorderedCell(scenario.label + (scenario.id === earningsParams.selectedScenario ? ' (ACTIVE)' : '')),
+            createBorderedCell(scenario.retirementAge.toFixed(1), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(scenario.yfs.toFixed(2), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(`${scenario.wlfPercent.toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(scenario.totalPastLoss), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(scenario.totalFuturePV), { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(fmtUSD(scenario.grandTotal), { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+      }
+
+      // LCP Table
+      const lcpRows = lcpItems.length > 0 ? [
+        new TableRow({
+          children: [
+            createBorderedCell('Item', { bold: true }),
+            createBorderedCell('Category', { bold: true }),
+            createBorderedCell('Base Cost', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Duration', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('PV', { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        ...lcpData.items.map(item => {
+          const endYear = item.endYear ?? item.startYear + item.duration - 1;
+          const duration = Math.max(1, endYear - item.startYear + 1);
+          const durationLabel = item.useCustomYears ? `${item.customYears.length} selected` : `${duration} yrs`;
+          return new TableRow({
+            children: [
+              createBorderedCell(item.name),
+              createBorderedCell(item.categoryId),
+              createBorderedCell(fmtUSD(item.baseCost), { alignment: AlignmentType.RIGHT }),
+              createBorderedCell(durationLabel, { alignment: AlignmentType.RIGHT }),
+              createBorderedCell(fmtUSD(item.totalPV), { bold: true, alignment: AlignmentType.RIGHT }),
+            ]
+          });
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('TOTAL', { bold: true }),
+            createBorderedCell(''),
+            createBorderedCell(''),
+            createBorderedCell(''),
+            createBorderedCell(fmtUSD(lcpData.totalPV), { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+      ] : [];
+
       const doc = new Document({
         sections: [{
           children: [
-            new Paragraph({ children: [new TextRun({ text: 'APPRAISAL OF ECONOMIC LOSS', bold: true, size: 36 })], alignment: AlignmentType.CENTER }),
-            new Paragraph({ children: [new TextRun({ text: `Regarding: ${caseInfo.plaintiff}`, size: 24 })], spacing: { after: 200 } }),
-            new Paragraph({ children: [new TextRun({ text: `Grand Total: ${fmtUSD(grandTotal)}`, bold: true, size: 28 })] }),
+            // Header
+            new Paragraph({ 
+              children: [new TextRun({ text: 'APPRAISAL OF ECONOMIC LOSS', bold: true, size: 36 })], 
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 }
+            }),
+            new Paragraph({ 
+              children: [new TextRun({ text: 'PREPARED BY: Kincaid Wolstein Vocational and Rehabilitation Services', size: 22 })], 
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({ 
+              children: [new TextRun({ text: 'One University Plaza ~ Suite 302, Hackensack, New Jersey 07601', size: 20 })], 
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 }
+            }),
+            new Paragraph({ 
+              children: [new TextRun({ text: `PREPARED FOR: ${caseInfo.attorney || '[Attorney]'} — ${caseInfo.lawFirm || '[Law Firm]'}`, size: 22 })], 
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({ 
+              children: [new TextRun({ text: `REGARDING: ${caseInfo.plaintiff || '[Plaintiff]'}`, size: 22 })], 
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({ 
+              children: [new TextRun({ text: `DATE OF BIRTH: ${formatDate(caseInfo.dob)}`, size: 22 })], 
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({ 
+              children: [new TextRun({ text: `REPORT DATE: ${formatDate(caseInfo.reportDate)}`, size: 22 })], 
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 }
+            }),
+
+            // Certification
+            new Paragraph({ text: 'CERTIFICATION', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Paragraph({ 
+              children: [new TextRun({ 
+                text: 'This is to certify that we are not related to any of the parties to the subject action, nor do we have any present or intended financial interest in this case beyond the fees due for professional services rendered in connection with this report and possible subsequent services.',
+                size: 22
+              })],
+              spacing: { after: 300 }
+            }),
+
+            // Opinion of Economic Losses
+            new Paragraph({ text: 'OPINION OF ECONOMIC LOSSES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Paragraph({ 
+              children: [new TextRun({ 
+                text: `Within a reasonable degree of economic certainty, ${caseInfo.plaintiff || '[Plaintiff]'} has sustained compensable economic losses as summarized below.`,
+                size: 22
+              })],
+              spacing: { after: 200 }
+            }),
+            new Table({ rows: lossSummaryRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+
+            // Background Facts
+            new Paragraph({ text: 'BACKGROUND FACTS AND ASSUMPTIONS', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Paragraph({ children: [new TextRun({ text: `Plaintiff: ${caseInfo.plaintiff} (${caseInfo.gender})`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Date of Birth: ${formatDate(caseInfo.dob)}`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Date of Injury: ${formatDate(caseInfo.dateOfInjury)}`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Date of Trial: ${formatDate(caseInfo.dateOfTrial)}`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Residence: ${[caseInfo.city, caseInfo.county, caseInfo.state].filter(Boolean).join(', ')}`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Education: ${caseInfo.education}`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Current Age: ${dateCalc.currentAge} years`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Age at Injury: ${dateCalc.ageInjury} years`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Life Expectancy: ${caseInfo.lifeExpectancy} years`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Work Life Expectancy: ${earningsParams.wle} years`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Years to Separation: ${dateCalc.derivedYFS.toFixed(2)} years`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Work Life Factor: ${workLifeFactor.toFixed(2)}%`, size: 22 })], spacing: { after: 200 } }),
+            ...(caseInfo.medicalSummary ? [
+              new Paragraph({ children: [new TextRun({ text: 'Medical Summary', bold: true, size: 22 })], spacing: { before: 200 } }),
+              new Paragraph({ children: [new TextRun({ text: caseInfo.medicalSummary, size: 22 })], spacing: { after: 200 } }),
+            ] : []),
+            ...(caseInfo.employmentHistory ? [
+              new Paragraph({ children: [new TextRun({ text: 'Employment History', bold: true, size: 22 })], spacing: { before: 200 } }),
+              new Paragraph({ children: [new TextRun({ text: caseInfo.employmentHistory, size: 22 })], spacing: { after: 200 } }),
+            ] : []),
+
+            // AEF Table
+            new Paragraph({ text: 'ADJUSTED EARNINGS FACTOR (AEF) – ALGEBRAIC METHOD', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Table({ rows: aefRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+
+            // Economic Variables
+            new Paragraph({ text: 'ECONOMIC VARIABLES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Paragraph({ children: [new TextRun({ text: `Pre-Injury Earnings: ${fmtUSD(earningsParams.baseEarnings)}/year`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Post-Injury Residual: ${fmtUSD(earningsParams.residualEarnings)}/year`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Wage Growth Rate: ${earningsParams.wageGrowth}%`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Discount Rate: ${earningsParams.discountRate}%`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Unemployment Rate: ${earningsParams.unemploymentRate}%`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Federal Tax Rate: ${earningsParams.fedTaxRate}%`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `State Tax Rate: ${earningsParams.stateTaxRate}%`, size: 22 })] }),
+            new Paragraph({ children: [new TextRun({ text: `Combined Tax Rate: ${fmtPct(algebraic.combinedTaxRate)}`, size: 22 })], spacing: { after: 200 } }),
+
+            // Earnings Schedule
+            new Paragraph({ text: 'EARNINGS DAMAGE SCHEDULE', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Table({ rows: earningsScheduleRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+
+            // Retirement Scenario Comparison
+            new Paragraph({ text: 'RETIREMENT SCENARIO ANALYSIS', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Paragraph({ 
+              children: [new TextRun({ 
+                text: `The following table presents projected damages under multiple retirement age scenarios. The active scenario is used for primary calculations throughout this report.`,
+                size: 22
+              })],
+              spacing: { after: 200 }
+            }),
+            new Table({ rows: scenarioRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+
+            // LCP Summary
+            ...(lcpItems.length > 0 ? [
+              new Paragraph({ text: 'LIFE CARE PLAN SUMMARY', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+              new Table({ rows: lcpRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+            ] : []),
+
+            // Household Services
+            ...(hhServices.active ? [
+              new Paragraph({ text: 'HOUSEHOLD SERVICES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+              new Paragraph({ children: [new TextRun({ text: `Hours per Week: ${hhServices.hoursPerWeek}`, size: 22 })] }),
+              new Paragraph({ children: [new TextRun({ text: `Hourly Rate: $${hhServices.hourlyRate}`, size: 22 })] }),
+              new Paragraph({ children: [new TextRun({ text: `Growth Rate: ${hhServices.growthRate}%`, size: 22 })] }),
+              new Paragraph({ children: [new TextRun({ text: `Discount Rate: ${hhServices.discountRate}%`, size: 22 })] }),
+              new Paragraph({ children: [new TextRun({ text: `Nominal Total: ${fmtUSD(hhsData.totalNom)}`, size: 22 })] }),
+              new Paragraph({ children: [new TextRun({ text: `Present Value: ${fmtUSD(hhsData.totalPV)}`, size: 22, bold: true })], spacing: { after: 200 } }),
+            ] : []),
+
+            // Statement of Ethics
+            new Paragraph({ text: 'STATEMENT OF ETHICAL PRINCIPLES', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+            new Paragraph({ 
+              children: [new TextRun({ 
+                text: 'The undersigned certifies that this appraisal was prepared in accordance with the ethical guidelines of the National Association of Forensic Economics (NAFE) and the American Rehabilitation Economics Association (AREA). The opinions expressed are based solely on the facts and data made available, and the undersigned has no financial interest in the outcome of this litigation.',
+                size: 22
+              })]
+            }),
           ]
         }]
       });
+      
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `Economic_Appraisal_${caseInfo.plaintiff || 'Report'}.docx`);
       addExportRecord({ type: 'word', plaintiffName: caseInfo.plaintiff, grandTotal });
     } finally {
       setIsExportingWord(false);
     }
-  }, [caseInfo.plaintiff, grandTotal, fmtUSD]);
+  }, [caseInfo, earningsParams, projection, hhServices, hhsData, lcpItems, lcpData, algebraic, dateCalc, grandTotal, workLifeFactor, isUnionMode, fmtUSD, fmtPct, scenarioProjectionsWithIncluded]);
 
   const handlePrint = useCallback(() => {
     addExportRecord({ type: 'print', plaintiffName: caseInfo.plaintiff, grandTotal });
@@ -426,7 +779,7 @@ export default function ForensicSuite() {
       case 'lcp':
         return <LCPStep lcpItems={lcpItems} setLcpItems={setLcpItems} lcpData={lcpData} lifeExpectancy={caseInfo.lifeExpectancy} fmtUSD={fmtUSD} baseYear={baseCalendarYear} />;
       case 'summary':
-        return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} scenarioProjections={scenarioProjectionsWithIncluded} selectedScenario={earningsParams.selectedScenario} onToggleScenarioIncluded={handleToggleScenarioIncluded} fmtUSD={fmtUSD} fmtPct={fmtPct} />;
+        return <SummaryStep projection={projection} hhServices={hhServices} hhsData={hhsData} lcpData={lcpData} lcpItems={lcpItems} algebraic={algebraic} workLifeFactor={workLifeFactor} grandTotal={grandTotal} scenarioProjections={scenarioProjectionsWithIncluded} selectedScenario={earningsParams.selectedScenario} onToggleScenarioIncluded={handleToggleScenarioIncluded} fmtUSD={fmtUSD} fmtPct={fmtPct} caseInfo={caseInfo} earningsParams={earningsParams} isUnionMode={isUnionMode} baseCalendarYear={baseCalendarYear} ageAtInjury={ageAtInjury} />;
       case 'report':
         return (
           <ReportStep
