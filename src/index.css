@@ -151,27 +151,95 @@
     print-color-adjust: exact;
   }
   
-  .print\\:hidden {
+  .print\:hidden {
     display: none !important;
   }
   
-  .print\\:shadow-none {
+  .print\:shadow-none {
     box-shadow: none !important;
   }
   
-  .print\\:p-0 {
+  .print\:p-0 {
     padding: 0 !important;
   }
   
-  .print\\:bg-white {
+  .print\:bg-white {
     background: white !important;
   }
   
-  .print\\:pb-0 {
+  .print\:pb-0 {
     padding-bottom: 0 !important;
   }
   
-  .print\\:w-full {
+  .print\:w-full {
     width: 100% !important;
+  }
+
+  /* YOY Table Print Styles */
+  .yoy-table {
+    page-break-inside: auto;
+  }
+
+  .yoy-table thead {
+    display: table-header-group;
+  }
+
+  .yoy-table tbody tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .yoy-table-section {
+    page-break-before: auto;
+    page-break-after: auto;
+    page-break-inside: avoid;
+  }
+
+  .yoy-table-header {
+    page-break-after: avoid;
+  }
+
+  /* Ensure each major section starts fresh if needed */
+  .print-section {
+    page-break-before: always;
+  }
+
+  .print-section-first {
+    page-break-before: avoid;
+  }
+
+  /* Keep table headers with content */
+  .print-keep-together {
+    page-break-inside: avoid;
+  }
+
+  /* Scenario cards should stay together */
+  .scenario-card {
+    page-break-inside: avoid;
+    margin-bottom: 12px;
+  }
+
+  /* Charts should not break */
+  .print-chart {
+    page-break-inside: avoid;
+    page-break-before: auto;
+    page-break-after: auto;
+  }
+
+  /* Summary cards grid */
+  .summary-grid {
+    page-break-inside: avoid;
+  }
+
+  /* Force page break after large tables */
+  .yoy-table-container {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Collapsible sections should show content when printing */
+  [data-state="closed"] > .collapsible-content-print {
+    display: block !important;
+    height: auto !important;
   }
 }

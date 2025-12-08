@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Table, Copy, Check, Target, BarChart3, TrendingUp, ChevronDown, ChevronRight, HeartPulse, Home, Download, FileSpreadsheet } from 'lucide-react';
+import { Table, Copy, Check, Target, BarChart3, TrendingUp, ChevronDown, ChevronRight, HeartPulse, Home, Download, FileSpreadsheet, Archive } from 'lucide-react';
 import { Card } from '../ui';
 import { Projection, HhServices, HhsData, LcpData, Algebraic, ScenarioProjection, CaseInfo, EarningsParams, LcpItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList, LineChart, Line, Legend, AreaChart, Area } from 'recharts';
@@ -20,7 +20,8 @@ import {
   exportEarningsScheduleToCsv,
   exportLcpScheduleToCsv,
   exportHouseholdScheduleToCsv,
-  exportScenarioComparisonToCsv
+  exportScenarioComparisonToCsv,
+  exportAllSchedulesToZip
 } from '../csvExport';
 
 interface SummaryStepProps {
@@ -310,8 +311,17 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
               </CollapsibleTrigger>
               <CollapsibleContent>
                 {/* CSV Export & View Toggle Toolbar */}
-                <div className="p-3 bg-background border-b border-border flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                <div className="p-3 bg-background border-b border-border flex flex-wrap items-center justify-between gap-2 print:hidden">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => exportAllSchedulesToZip(csvExportParams)}
+                      className="h-8 text-xs"
+                    >
+                      <Archive className="w-3 h-3 mr-1" />
+                      Export All (ZIP)
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -319,7 +329,7 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                       className="h-8 text-xs"
                     >
                       <FileSpreadsheet className="w-3 h-3 mr-1" />
-                      Export CSV
+                      Scenarios CSV
                     </Button>
                     <Button
                       variant="outline"
@@ -448,8 +458,8 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                                     <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">
                                       Year-Over-Year Schedule: {scenario.label}
                                     </h4>
-                                    <div className="overflow-x-auto max-h-[300px]">
-                                      <table className="w-full text-xs border-collapse">
+                                    <div className="overflow-x-auto max-h-[300px] yoy-table-container">
+                                      <table className="w-full text-xs border-collapse yoy-table">
                                         <thead className="bg-background sticky top-0">
                                           <tr>
                                             <th className="p-2 text-left border border-border">Year #</th>
@@ -630,8 +640,8 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                   </ResponsiveContainer>
                 </div>
                 {/* LCP Table */}
-                <div className="overflow-x-auto max-h-[400px]">
-                  <table className="w-full text-xs border-collapse">
+                <div className="overflow-x-auto max-h-[400px] yoy-table-container">
+                  <table className="w-full text-xs border-collapse yoy-table">
                     <thead className="bg-muted sticky top-0">
                       <tr>
                         <th className="p-2 text-left border border-border">Year #</th>
@@ -699,8 +709,8 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                   </Button>
                 </div>
               </div>
-              <div className="px-4 pb-4 overflow-x-auto max-h-[400px]">
-                <table className="w-full text-xs border-collapse">
+              <div className="px-4 pb-4 overflow-x-auto max-h-[400px] yoy-table-container">
+                <table className="w-full text-xs border-collapse yoy-table">
                   <thead className="bg-muted sticky top-0">
                     <tr>
                       <th className="p-2 text-left border border-border">Year #</th>
@@ -742,8 +752,8 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
             {copySuccess || 'Copy'}
           </button>
         </div>
-        <div className="overflow-auto max-h-[400px]">
-          <table className="w-full text-sm text-right border-collapse">
+        <div className="overflow-auto max-h-[400px] yoy-table-container">
+          <table className="w-full text-sm text-right border-collapse yoy-table">
             <thead className="bg-muted text-muted-foreground font-bold sticky top-0 z-10">
               <tr>
                 <th className="p-3 text-left">Year</th>

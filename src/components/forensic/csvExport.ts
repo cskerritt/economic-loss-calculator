@@ -1,9 +1,11 @@
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import { CaseInfo, EarningsParams, HhServices, LcpItem, Algebraic, ScenarioProjection } from './types';
-import { computeDetailedScenarioSchedule, computeDetailedLcpSchedule, computeDetailedHhsSchedule, DetailedScheduleRow, DetailedLcpScheduleRow, DetailedHhsScheduleRow } from './calculations';
+import { computeDetailedScenarioSchedule, computeDetailedLcpSchedule, computeDetailedHhsSchedule } from './calculations';
 
 export type CsvExportType = 'earnings' | 'lcp' | 'household' | 'scenario';
 
-interface CsvExportParams {
+export interface CsvExportParams {
   caseInfo: CaseInfo;
   earningsParams: EarningsParams;
   hhServices: HhServices;
@@ -40,10 +42,8 @@ const downloadCsv = (content: string, filename: string): void => {
   URL.revokeObjectURL(link.href);
 };
 
-export function exportEarningsScheduleToCsv(
-  params: CsvExportParams,
-  scenarioId?: string
-): void {
+// Generate earnings CSV content (reusable)
+function generateEarningsCsv(params: CsvExportParams, scenarioId?: string): string {
   const { caseInfo, earningsParams, scenarioProjections, isUnionMode, baseCalendarYear, ageAtInjury } = params;
   
   const scenarios = scenarioId 
@@ -71,13 +71,12 @@ export function exportEarningsScheduleToCsv(
     }
   }
 
-  const csv = arrayToCsv(headers, rows);
-  const filename = `Earnings_YOY_${caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
-  downloadCsv(csv, filename);
+  return arrayToCsv(headers, rows);
 }
 
-export function exportLcpScheduleToCsv(params: CsvExportParams): void {
-  const { caseInfo, earningsParams, lcpItems, baseCalendarYear } = params;
+// Generate LCP CSV content (reusable)
+function generateLcpCsv(params: CsvExportParams): string {
+  const { earningsParams, lcpItems, baseCalendarYear } = params;
   
   const schedule = computeDetailedLcpSchedule(lcpItems, earningsParams.discountRate, baseCalendarYear);
   
@@ -91,13 +90,12 @@ export function exportLcpScheduleToCsv(params: CsvExportParams): void {
     row.cumPV.toFixed(2)
   ]);
 
-  const csv = arrayToCsv(headers, rows);
-  const filename = `LCP_YOY_${caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
-  downloadCsv(csv, filename);
+  return arrayToCsv(headers, rows);
 }
 
-export function exportHouseholdScheduleToCsv(params: CsvExportParams): void {
-  const { caseInfo, hhServices, algebraic, baseCalendarYear } = params;
+// Generate Household CSV content (reusable)
+function generateHouseholdCsv(params: CsvExportParams): string {
+  const { hhServices, algebraic, baseCalendarYear } = params;
   
   const schedule = computeDetailedHhsSchedule(hhServices, algebraic.yfs, baseCalendarYear);
   
@@ -110,13 +108,12 @@ export function exportHouseholdScheduleToCsv(params: CsvExportParams): void {
     row.cumPV.toFixed(2)
   ]);
 
-  const csv = arrayToCsv(headers, rows);
-  const filename = `Household_YOY_${caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
-  downloadCsv(csv, filename);
+  return arrayToCsv(headers, rows);
 }
 
-export function exportScenarioComparisonToCsv(params: CsvExportParams): void {
-  const { caseInfo, scenarioProjections } = params;
+// Generate Scenario Comparison CSV content (reusable)
+function generateScenarioComparisonCsv(params: CsvExportParams): string {
+  const { scenarioProjections } = params;
   
   const headers = ['Scenario', 'Retirement Age', 'YFS', 'WLF %', 'Past Loss', 'Future PV', 'Earnings Total', 'Grand Total', 'Included'];
   const rows: (string | number)[][] = scenarioProjections.map(s => [
@@ -131,7 +128,92 @@ export function exportScenarioComparisonToCsv(params: CsvExportParams): void {
     s.included ? 'Yes' : 'No'
   ]);
 
-  const csv = arrayToCsv(headers, rows);
-  const filename = `Scenario_Comparison_${caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
+  return arrayToCsv(headers, rows);
+}
+
+export function exportEarningsScheduleToCsv(
+  params: CsvExportParams,
+  scenarioId?: string
+): void {
+  const csv = generateEarningsCsv(params, scenarioId);
+  const filename = `Earnings_YOY_${params.caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
   downloadCsv(csv, filename);
+}
+
+export function exportLcpScheduleToCsv(params: CsvExportParams): void {
+  const csv = generateLcpCsv(params);
+  const filename = `LCP_YOY_${params.caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadCsv(csv, filename);
+}
+
+export function exportHouseholdScheduleToCsv(params: CsvExportParams): void {
+  const csv = generateHouseholdCsv(params);
+  const filename = `Household_YOY_${params.caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadCsv(csv, filename);
+}
+
+export function exportScenarioComparisonToCsv(params: CsvExportParams): void {
+  const csv = generateScenarioComparisonCsv(params);
+  const filename = `Scenario_Comparison_${params.caseInfo.plaintiff || 'Report'}_${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadCsv(csv, filename);
+}
+
+// Combined ZIP export with all schedules
+export async function exportAllSchedulesToZip(params: CsvExportParams): Promise<void> {
+  const zip = new JSZip();
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const plaintiff = params.caseInfo.plaintiff || 'Report';
+  
+  // Add scenario comparison
+  zip.file(`Scenario_Comparison_${plaintiff}.csv`, generateScenarioComparisonCsv(params));
+  
+  // Add earnings schedule
+  zip.file(`Earnings_YOY_${plaintiff}.csv`, generateEarningsCsv(params));
+  
+  // Add LCP schedule if there are items
+  if (params.lcpItems.length > 0) {
+    zip.file(`LCP_YOY_${plaintiff}.csv`, generateLcpCsv(params));
+  }
+  
+  // Add household services schedule if active
+  if (params.hhServices.active) {
+    zip.file(`Household_YOY_${plaintiff}.csv`, generateHouseholdCsv(params));
+  }
+  
+  // Add a summary info file
+  const summaryInfo = [
+    `Economic Damages Analysis - ${plaintiff}`,
+    `Export Date: ${dateStr}`,
+    ``,
+    `Case Information:`,
+    `  Plaintiff: ${params.caseInfo.plaintiff}`,
+    `  Attorney: ${params.caseInfo.attorney}`,
+    `  Law Firm: ${params.caseInfo.lawFirm}`,
+    `  Date of Injury: ${params.caseInfo.dateOfInjury}`,
+    `  Date of Report: ${params.caseInfo.reportDate}`,
+    ``,
+    `Economic Parameters:`,
+    `  Base Earnings: $${params.earningsParams.baseEarnings.toLocaleString()}`,
+    `  Residual Earnings: $${params.earningsParams.residualEarnings.toLocaleString()}`,
+    `  Wage Growth Rate: ${params.earningsParams.wageGrowth}%`,
+    `  Discount Rate: ${params.earningsParams.discountRate}%`,
+    `  Work Life Expectancy: ${params.earningsParams.wle} years`,
+    ``,
+    `Included Scenarios:`,
+    ...params.scenarioProjections.filter(s => s.included).map(s => 
+      `  ${s.label}: Grand Total = $${s.grandTotal.toLocaleString()}`
+    ),
+    ``,
+    `Files Included:`,
+    `  - Scenario_Comparison_${plaintiff}.csv`,
+    `  - Earnings_YOY_${plaintiff}.csv`,
+    params.lcpItems.length > 0 ? `  - LCP_YOY_${plaintiff}.csv` : null,
+    params.hhServices.active ? `  - Household_YOY_${plaintiff}.csv` : null,
+  ].filter(Boolean).join('\n');
+  
+  zip.file(`README_${plaintiff}.txt`, summaryInfo);
+  
+  // Generate and download zip
+  const blob = await zip.generateAsync({ type: 'blob' });
+  saveAs(blob, `Economic_Analysis_${plaintiff}_${dateStr}.zip`);
 }
