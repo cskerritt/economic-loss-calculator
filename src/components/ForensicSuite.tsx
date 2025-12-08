@@ -807,6 +807,8 @@ export default function ForensicSuite() {
             onExportWord={handleExportWord}
             fmtUSD={fmtUSD}
             fmtPct={fmtPct}
+            baseCalendarYear={baseCalendarYear}
+            ageAtInjury={ageAtInjury}
           />
         );
       default:
