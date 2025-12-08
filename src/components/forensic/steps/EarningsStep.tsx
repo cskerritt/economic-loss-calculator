@@ -194,6 +194,98 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
         </div>
       </div>
 
+      {/* Case Type & Methodology Card */}
+      <Card className="p-4 sm:p-5 border-l-4 border-l-rose-500">
+        <SectionHeader icon={Skull} title="Case Type & Methodology" subtitle="Tinari Algebraic Method" />
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <label className={`flex-1 flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all touch-manipulation ${!earningsParams.isWrongfulDeath ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'}`}>
+            <input 
+              type="radio" 
+              name="caseType"
+              checked={!earningsParams.isWrongfulDeath} 
+              onChange={() => setEarningsParams({...earningsParams, isWrongfulDeath: false})} 
+              className="w-5 h-5" 
+            />
+            <div>
+              <span className="font-medium text-foreground">Personal Injury</span>
+              <p className="text-xs text-muted-foreground">No personal consumption deduction</p>
+            </div>
+          </label>
+          <label className={`flex-1 flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all touch-manipulation ${earningsParams.isWrongfulDeath ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'}`}>
+            <input 
+              type="radio" 
+              name="caseType"
+              checked={earningsParams.isWrongfulDeath} 
+              onChange={() => setEarningsParams({...earningsParams, isWrongfulDeath: true})} 
+              className="w-5 h-5" 
+            />
+            <div>
+              <span className="font-medium text-foreground">Wrongful Death</span>
+              <p className="text-xs text-muted-foreground">Includes personal consumption</p>
+            </div>
+          </label>
+        </div>
+        
+        {earningsParams.isWrongfulDeath && (
+          <div className="bg-rose-500/10 p-3 rounded-lg mb-4">
+            <h4 className="text-xs font-bold uppercase text-rose-600 mb-2">Personal Consumption Rates</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <InputGroup 
+                label="Era 1 (Past)" 
+                suffix="%" 
+                value={earningsParams.era1PersonalConsumption} 
+                onChange={v => setEarningsParams({...earningsParams, era1PersonalConsumption: parseFloat(v) || 0})} 
+              />
+              <InputGroup 
+                label="Era 2 (Future)" 
+                suffix="%" 
+                value={earningsParams.era2PersonalConsumption} 
+                onChange={v => setEarningsParams({...earningsParams, era2PersonalConsumption: parseFloat(v) || 0})} 
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Typical: 25-30% for families with children, 30-40% for couples without.</p>
+          </div>
+        )}
+        
+        {/* Era Split Toggle */}
+        <div className="border-t border-border pt-3">
+          <label className="flex items-center gap-2 cursor-pointer mb-3 min-h-[40px] touch-manipulation">
+            <input 
+              type="checkbox" 
+              checked={earningsParams.useEraSplit} 
+              onChange={e => setEarningsParams({...earningsParams, useEraSplit: e.target.checked})}
+              className="w-5 h-5 rounded"
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">Enable Era-Based Calculations</span>
+              <p className="text-xs text-muted-foreground">Different wage growth for past vs future periods</p>
+            </div>
+          </label>
+          
+          {earningsParams.useEraSplit && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-violet-500/10 p-3 rounded-lg">
+              <InputGroup 
+                label="Era Split Year" 
+                value={earningsParams.eraSplitYear} 
+                onChange={v => setEarningsParams({...earningsParams, eraSplitYear: parseInt(v) || new Date().getFullYear()})} 
+              />
+              <InputGroup 
+                label="Era 1 Wage Growth" 
+                suffix="%" 
+                value={earningsParams.era1WageGrowth} 
+                onChange={v => setEarningsParams({...earningsParams, era1WageGrowth: parseFloat(v) || 0})} 
+              />
+              <InputGroup 
+                label="Era 2 Wage Growth" 
+                suffix="%" 
+                value={earningsParams.era2WageGrowth} 
+                onChange={v => setEarningsParams({...earningsParams, era2WageGrowth: parseFloat(v) || 0})} 
+              />
+            </div>
+          )}
+        </div>
+      </Card>
+
       <div className="text-center mb-4 sm:mb-8">
         <h2 className="text-xl sm:text-2xl font-bold text-foreground">Earnings & Economic Variables</h2>
         <p className="text-sm text-muted-foreground mt-1">Configure earnings capacity, work life, and retirement scenarios</p>

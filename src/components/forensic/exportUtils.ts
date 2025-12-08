@@ -123,8 +123,117 @@ export async function exportSectionToWord(
         ]
       }));
 
+      // Tinari AEF Methodology Table
+      const aefRows = [
+        new TableRow({
+          children: [
+            createBorderedCell('Step', { bold: true }),
+            createBorderedCell('Component', { bold: true }),
+            createBorderedCell('Factor', { bold: true, alignment: AlignmentType.RIGHT }),
+            createBorderedCell('Cumulative', { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('1'),
+            createBorderedCell('Gross Earnings Base'),
+            createBorderedCell('100.00%', { alignment: AlignmentType.RIGHT }),
+            createBorderedCell('100.00%', { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('2'),
+            createBorderedCell('× Work Life Factor (WLF)'),
+            createBorderedCell(`${(algebraic.wlf * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(`${(algebraic.worklifeAdjustedBase * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('3'),
+            createBorderedCell('× (1 - Unemployment Factor)'),
+            createBorderedCell(`${(algebraic.unempFactor * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(`${(algebraic.unemploymentAdjustedBase * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('4'),
+            createBorderedCell('× (1 + Fringe Benefits)'),
+            createBorderedCell(`${(algebraic.fringeFactor * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(`${(algebraic.grossCompensationWithFringes * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+        new TableRow({
+          children: [
+            createBorderedCell('5'),
+            createBorderedCell('− Tax on Base Earnings'),
+            createBorderedCell(`-${(algebraic.taxOnBaseEarnings * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(`${(algebraic.afterTaxCompensation * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+          ]
+        }),
+      ];
+
+      // Add personal consumption rows for wrongful death
+      if (earningsParams.isWrongfulDeath) {
+        aefRows.push(new TableRow({
+          children: [
+            createBorderedCell('6a'),
+            createBorderedCell('× (1 - Personal Consumption) Era 1'),
+            createBorderedCell(`${(algebraic.era1PersonalConsumptionFactor * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(`${(algebraic.era1AIF * 100).toFixed(2)}%`, { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+        aefRows.push(new TableRow({
+          children: [
+            createBorderedCell('6b'),
+            createBorderedCell('× (1 - Personal Consumption) Era 2'),
+            createBorderedCell(`${(algebraic.era2PersonalConsumptionFactor * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell(`${(algebraic.era2AIF * 100).toFixed(2)}%`, { bold: true, alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+      }
+
+      aefRows.push(new TableRow({
+        children: [
+          createBorderedCell(''),
+          createBorderedCell('ADJUSTED INCOME FACTOR (AIF)', { bold: true }),
+          createBorderedCell('', { alignment: AlignmentType.RIGHT }),
+          createBorderedCell(`${(algebraic.fullMultiplier * 100).toFixed(4)}%`, { bold: true, alignment: AlignmentType.RIGHT }),
+        ]
+      }));
+
+      // Build wage growth description
+      const wageGrowthDesc = earningsParams.useEraSplit 
+        ? `Era 1: ${earningsParams.era1WageGrowth}% | Era 2: ${earningsParams.era2WageGrowth}%`
+        : `${earningsParams.wageGrowth}%`;
+
       docChildren = [
         ...headerParagraphs,
+        new Paragraph({ text: 'TINARI ALGEBRAIC METHOD - AEF CALCULATION', heading: HeadingLevel.HEADING_1, spacing: { before: 200, after: 200 } }),
+        new Paragraph({ 
+          children: [new TextRun({ 
+            text: `Case Type: ${earningsParams.isWrongfulDeath ? 'Wrongful Death' : 'Personal Injury'}`,
+            size: 20, bold: true
+          })],
+          spacing: { after: 100 }
+        }),
+        new Paragraph({ 
+          children: [new TextRun({ 
+            text: `Formula: AIF = {[(GE × WLF) × (1-UF)) × (1+FB)] − [(GE × WLF) × (1-UF)] × TL} × (1-PC)`,
+            size: 18, italics: true
+          })],
+          spacing: { after: 200 }
+        }),
+        new Table({ rows: aefRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+        new Paragraph({ 
+          children: [new TextRun({ 
+            text: 'Note: Taxes applied only to base earnings (not fringes) per Tinari method.',
+            size: 18, italics: true
+          })],
+          spacing: { before: 100, after: 300 }
+        }),
         new Paragraph({ text: 'EARNINGS DAMAGE SCHEDULE', heading: HeadingLevel.HEADING_1, spacing: { before: 200, after: 200 } }),
         new Paragraph({ 
           children: [new TextRun({ 
@@ -135,7 +244,7 @@ export async function exportSectionToWord(
         }),
         new Paragraph({ 
           children: [new TextRun({ 
-            text: `Wage Growth: ${earningsParams.wageGrowth}% | Discount Rate: ${earningsParams.discountRate}% | Work Life Factor: ${(algebraic.wlf * 100).toFixed(2)}%`,
+            text: `Wage Growth: ${wageGrowthDesc} | Discount Rate: ${earningsParams.discountRate}% | WLF: ${(algebraic.wlf * 100).toFixed(2)}%`,
             size: 20
           })],
           spacing: { after: 200 }
@@ -312,12 +421,42 @@ export async function exportSectionToWord(
         );
       }
 
+      // Methodology description
+      const methodologyDesc = earningsParams.isWrongfulDeath 
+        ? `Wrongful Death case with ${earningsParams.era1PersonalConsumption}%/${earningsParams.era2PersonalConsumption}% personal consumption (Era 1/Era 2)`
+        : 'Personal Injury case (no personal consumption deduction)';
+
+      const eraDesc = earningsParams.useEraSplit
+        ? `Era-Based: ${earningsParams.era1WageGrowth}% (past) / ${earningsParams.era2WageGrowth}% (future) wage growth`
+        : `Uniform ${earningsParams.wageGrowth}% wage growth`;
+
       docChildren = [
         ...headerParagraphs,
         new Paragraph({ text: 'RETIREMENT SCENARIO COMPARISON', heading: HeadingLevel.HEADING_1, spacing: { before: 200, after: 200 } }),
         new Paragraph({ 
           children: [new TextRun({ 
-            text: `Age at Injury: ${ageAtInjury.toFixed(1)} | WLE: ${earningsParams.wle} years`,
+            text: `Methodology: Tinari Algebraic Method`,
+            size: 20, bold: true
+          })],
+          spacing: { after: 50 }
+        }),
+        new Paragraph({ 
+          children: [new TextRun({ 
+            text: methodologyDesc,
+            size: 18
+          })],
+          spacing: { after: 50 }
+        }),
+        new Paragraph({ 
+          children: [new TextRun({ 
+            text: eraDesc,
+            size: 18
+          })],
+          spacing: { after: 100 }
+        }),
+        new Paragraph({ 
+          children: [new TextRun({ 
+            text: `Age at Injury: ${ageAtInjury.toFixed(1)} | WLE: ${earningsParams.wle} years | AIF: ${(algebraic.fullMultiplier * 100).toFixed(2)}%`,
             size: 20
           })],
           spacing: { after: 200 }
