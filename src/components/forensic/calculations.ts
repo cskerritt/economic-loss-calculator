@@ -401,3 +401,190 @@ export function computeGrandTotal(
 ): number {
   return projection.totalPastLoss + projection.totalFuturePV + (hhServices.active ? hhsData.totalPV : 0) + lcpData.totalPV;
 }
+
+// Detailed year-over-year schedule for a scenario
+export interface DetailedScheduleRow {
+  yearNum: number;
+  calendarYear: number;
+  grossEarnings: number;
+  netLoss: number;
+  presentValue: number;
+  cumPV: number;
+  isPast: boolean;
+}
+
+export function computeDetailedScenarioSchedule(
+  caseInfo: CaseInfo,
+  earningsParams: EarningsParams,
+  retirementAge: number,
+  ageAtInjury: number,
+  isUnionMode: boolean,
+  baseCalendarYear: number
+): DetailedScheduleRow[] {
+  if (!caseInfo.dateOfInjury || !caseInfo.dob || ageAtInjury <= 0) return [];
+
+  const yfs = Math.max(0, retirementAge - ageAtInjury);
+  const wlf = yfs > 0 ? earningsParams.wle / yfs : 0;
+
+  const unempFactor =
+    1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
+  const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
+
+  let fringeFactor = 1;
+  if (isUnionMode) {
+    const flatFringe =
+      earningsParams.pension +
+      earningsParams.healthWelfare +
+      earningsParams.annuity +
+      earningsParams.clothingAllowance +
+      earningsParams.otherBenefits;
+    fringeFactor = earningsParams.baseEarnings > 0 ? 1 + flatFringe / earningsParams.baseEarnings : 1;
+  } else {
+    fringeFactor = 1 + earningsParams.fringeRate / 100;
+  }
+
+  const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
+  const schedule: DetailedScheduleRow[] = [];
+  let cumPV = 0;
+
+  const futureYears = Math.ceil(yfs);
+  for (let i = 0; i < futureYears; i++) {
+    const growth = Math.pow(1 + earningsParams.wageGrowth / 100, i);
+    const discount = 1 / Math.pow(1 + earningsParams.discountRate / 100, i + 0.5);
+    const grossBase = earningsParams.baseEarnings * growth;
+    const grossRes = earningsParams.residualEarnings * growth;
+    const netButFor = grossBase * fullMultiplier;
+    const netActual = grossRes * fullMultiplier;
+    const netLoss = netButFor - netActual;
+    const pv = netLoss * discount;
+    cumPV += pv;
+
+    schedule.push({
+      yearNum: i + 1,
+      calendarYear: baseCalendarYear + i,
+      grossEarnings: grossBase,
+      netLoss,
+      presentValue: pv,
+      cumPV,
+      isPast: false,
+    });
+  }
+
+  return schedule;
+}
+
+// Detailed year-over-year schedule for LCP items
+export interface DetailedLcpScheduleRow {
+  calendarYear: number;
+  yearNum: number;
+  items: { name: string; baseCost: number; inflatedCost: number; pv: number }[];
+  totalInflated: number;
+  totalPV: number;
+  cumPV: number;
+}
+
+export function computeDetailedLcpSchedule(
+  lcpItems: LcpItem[],
+  discountRate: number,
+  baseCalendarYear: number,
+  maxYears: number = 50
+): DetailedLcpScheduleRow[] {
+  const yearMap: Map<number, DetailedLcpScheduleRow> = new Map();
+  let cumPV = 0;
+
+  for (const item of lcpItems) {
+    const baseStartYear = Math.max(1, item.startYear || 1);
+    const endYear = Math.max(item.endYear || 0, baseStartYear + item.duration - 1);
+    const duration = Math.max(0, endYear - baseStartYear + 1);
+    const useCustom = item.useCustomYears && item.customYears && item.customYears.length > 0;
+
+    const yearsToProcess: number[] = [];
+
+    if (useCustom) {
+      yearsToProcess.push(...Array.from(new Set(item.customYears.filter((y) => y > 0))).sort((a, b) => a - b));
+    } else {
+      const interval = Math.max(1, item.recurrenceInterval || 1);
+      for (let t = 0; t < duration; t++) {
+        let active = false;
+        if (item.freqType === 'annual') active = true;
+        else if (item.freqType === 'onetime') active = t === 0;
+        else if (item.freqType === 'recurring') active = t % interval === 0;
+        if (active) yearsToProcess.push(baseStartYear + t);
+      }
+    }
+
+    for (const yearNum of yearsToProcess) {
+      const t = yearNum - 1;
+      const inflated = item.baseCost * Math.pow(1 + item.cpi / 100, t);
+      const discount = 1 / Math.pow(1 + discountRate / 100, t + 0.5);
+      const pv = inflated * discount;
+      const calendarYear = baseCalendarYear + t;
+
+      if (!yearMap.has(yearNum)) {
+        yearMap.set(yearNum, {
+          calendarYear,
+          yearNum,
+          items: [],
+          totalInflated: 0,
+          totalPV: 0,
+          cumPV: 0,
+        });
+      }
+
+      const row = yearMap.get(yearNum)!;
+      row.items.push({ name: item.name, baseCost: item.baseCost, inflatedCost: inflated, pv });
+      row.totalInflated += inflated;
+      row.totalPV += pv;
+    }
+  }
+
+  const sortedRows = Array.from(yearMap.values()).sort((a, b) => a.yearNum - b.yearNum);
+  for (const row of sortedRows) {
+    cumPV += row.totalPV;
+    row.cumPV = cumPV;
+  }
+
+  return sortedRows;
+}
+
+// Detailed household services year-over-year schedule
+export interface DetailedHhsScheduleRow {
+  yearNum: number;
+  calendarYear: number;
+  annualValue: number;
+  presentValue: number;
+  cumPV: number;
+}
+
+export function computeDetailedHhsSchedule(
+  hhServices: HhServices,
+  derivedYFS: number,
+  baseCalendarYear: number
+): DetailedHhsScheduleRow[] {
+  if (!hhServices.active) return [];
+
+  const schedule: DetailedHhsScheduleRow[] = [];
+  let cumPV = 0;
+  const years = Math.ceil(derivedYFS);
+
+  for (let i = 0; i < years; i++) {
+    const annualValue =
+      hhServices.hoursPerWeek *
+      52 *
+      hhServices.hourlyRate *
+      Math.pow(1 + hhServices.growthRate / 100, i);
+    const disc = 1 / Math.pow(1 + hhServices.discountRate / 100, i + 0.5);
+    const pv = annualValue * disc;
+    cumPV += pv;
+
+    schedule.push({
+      yearNum: i + 1,
+      calendarYear: baseCalendarYear + i,
+      annualValue,
+      presentValue: pv,
+      cumPV,
+    });
+  }
+
+  return schedule;
+}
