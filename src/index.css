@@ -142,6 +142,62 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* Mobile touch utilities */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Minimum touch target - 44x44px for accessibility */
+  .min-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Touch feedback animation */
+  .touch-feedback {
+    transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+  }
+  .touch-feedback:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+
+  /* Mobile scroll indicator for horizontal scrolling */
+  .scroll-indicator-x {
+    position: relative;
+  }
+  .scroll-indicator-x::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, hsl(var(--background)));
+    pointer-events: none;
+    opacity: 0.8;
+  }
+
+  /* Better focus states for mobile */
+  .mobile-focus:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+  }
+
+  /* Card mobile optimization */
+  .card-mobile {
+    @apply p-4 sm:p-5;
+  }
+
+  /* Button touch states */
+  .btn-touch {
+    @apply min-h-[44px] touch-manipulation;
+  }
 }
 
 @media print {

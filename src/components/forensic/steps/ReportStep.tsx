@@ -201,17 +201,17 @@ export const ReportStep: React.FC<ReportStepProps> = ({
 
       {/* Export Buttons */}
       <div className="text-center mb-6 print:hidden">
-        <h2 className="text-2xl font-bold text-foreground">Generate Report</h2>
-        <p className="text-muted-foreground mt-1">Export your complete economic appraisal report</p>
-        <div className="flex gap-3 justify-center mt-6 flex-wrap">
-          <button onClick={onPrint} disabled={!allValid} className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Generate Report</h2>
+        <p className="text-sm text-muted-foreground mt-1">Export your complete economic appraisal report</p>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center mt-4 sm:mt-6">
+          <button onClick={onPrint} disabled={!allValid} className="bg-slate-900 text-white px-5 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]">
             <FileText className="w-5 h-5" /> Print
           </button>
-          <button onClick={onExportPdf} disabled={isExportingPdf || !allValid} className="bg-rose-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={onExportPdf} disabled={isExportingPdf || !allValid} className="bg-rose-600 text-white px-5 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]">
             {isExportingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
             {isExportingPdf ? 'Exporting...' : 'Export PDF'}
           </button>
-          <button onClick={onExportWord} disabled={isExportingWord || !allValid} className="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={onExportWord} disabled={isExportingWord || !allValid} className="bg-blue-600 text-white px-5 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]">
             {isExportingWord ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
             {isExportingWord ? 'Exporting...' : 'Export Word'}
           </button>

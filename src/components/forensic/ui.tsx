@@ -129,15 +129,15 @@ export const InputGroup: React.FC<InputGroupProps> = ({
     : value;
   
   return (
-    <div className={`mb-3 ${className}`}>
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+    <div className={`mb-2 sm:mb-3 ${className}`}>
+      <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
         {label}
         {required && <span className="text-destructive ml-0.5">*</span>}
       </label>
       <div className={`relative rounded-lg shadow-sm ${disabled ? 'opacity-60' : ''}`}>
         {prefix && (
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span className="text-muted-foreground sm:text-sm font-medium">{prefix}</span>
+            <span className="text-muted-foreground text-sm font-medium">{prefix}</span>
           </div>
         )}
         <input
@@ -150,16 +150,16 @@ export const InputGroup: React.FC<InputGroupProps> = ({
           onChange={handleChange}
           onBlur={handleBlur}
           maxLength={type === 'date' ? 10 : undefined}
-          className={`block w-full rounded-lg py-2 focus:ring-2 text-sm border px-3 transition-all bg-background text-foreground ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''} ${hasError || showRequiredIndicator ? 'border-destructive focus:ring-destructive/30 focus:border-destructive' : 'border-border focus:ring-primary/30 focus:border-primary'}`}
+          className={`block w-full rounded-lg min-h-[44px] py-2.5 sm:py-2 focus:ring-2 text-sm border px-3 transition-all bg-background text-foreground touch-manipulation ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''} ${disabled ? 'bg-muted cursor-not-allowed' : ''} ${hasError || showRequiredIndicator ? 'border-destructive focus:ring-destructive/30 focus:border-destructive' : 'border-border focus:ring-primary/30 focus:border-primary'}`}
         />
         {suffix && (
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <span className="text-muted-foreground sm:text-sm font-medium">{suffix}</span>
+            <span className="text-muted-foreground text-sm font-medium">{suffix}</span>
           </div>
         )}
       </div>
       {hasError && (
-        <p className="text-[10px] text-destructive mt-1 font-medium">{error}</p>
+        <p className="text-[10px] sm:text-[11px] text-destructive mt-1 font-medium">{error}</p>
       )}
     </div>
   );
@@ -174,14 +174,14 @@ interface TextAreaProps {
 }
 
 export const TextArea: React.FC<TextAreaProps> = ({ label, value, onChange, placeholder = "", rows = 3 }) => (
-  <div className="mb-3">
-    <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</label>
+  <div className="mb-2 sm:mb-3">
+    <label className="block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</label>
     <textarea
       rows={rows}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="block w-full rounded-lg border-border py-2 focus:ring-primary focus:border-primary text-sm border px-3 transition-all resize-none bg-background text-foreground"
+      className="block w-full rounded-lg border-border py-2.5 sm:py-2 focus:ring-primary focus:border-primary text-sm border px-3 transition-all resize-none bg-background text-foreground touch-manipulation min-h-[44px]"
     />
   </div>
 );

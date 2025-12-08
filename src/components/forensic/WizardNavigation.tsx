@@ -188,33 +188,33 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
       </div>
 
       {/* Mobile Fixed Bottom Navigation */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-4 py-3 flex justify-between items-center z-50 shadow-lg">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-4 py-3 flex justify-between items-center z-50 shadow-lg safe-bottom">
         <button
           onClick={onPrevious}
           disabled={currentStep === 0}
-          className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-5 py-3 min-h-[48px] rounded-lg text-sm font-medium transition-all touch-manipulation active:scale-95 ${
             currentStep === 0
               ? 'opacity-30 cursor-not-allowed text-muted-foreground'
-              : 'bg-muted hover:bg-muted/80 text-foreground'
+              : 'bg-muted hover:bg-muted/80 text-foreground active:bg-muted/70'
           }`}
         >
-          <ChevronLeft className="w-4 h-4" /> Prev
+          <ChevronLeft className="w-5 h-5" /> Prev
         </button>
         
-        <span className="text-xs text-muted-foreground font-medium">
+        <span className="text-sm text-muted-foreground font-medium tabular-nums">
           {currentStep + 1} / {steps.length}
         </span>
         
         <button
           onClick={onNext}
           disabled={currentStep === steps.length - 1}
-          className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-5 py-3 min-h-[48px] rounded-lg text-sm font-medium transition-all touch-manipulation active:scale-95 ${
             currentStep === steps.length - 1
               ? 'opacity-30 cursor-not-allowed text-muted-foreground'
-              : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm'
+              : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:bg-primary/80'
           }`}
         >
-          Next <ChevronRight className="w-4 h-4" />
+          Next <ChevronRight className="w-5 h-5" />
         </button>
       </div>
     </div>

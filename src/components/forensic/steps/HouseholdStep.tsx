@@ -17,29 +17,29 @@ export const HouseholdStep: React.FC<HouseholdStepProps> = ({
   fmtUSD 
 }) => {
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Household Services</h2>
-        <p className="text-muted-foreground mt-1">Calculate loss of domestic capacity</p>
+    <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in px-2 sm:px-0">
+      <div className="text-center mb-4 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">Household Services</h2>
+        <p className="text-sm text-muted-foreground mt-1">Calculate loss of domestic capacity</p>
       </div>
 
-      <Card className="p-6 border-l-4 border-l-rose">
-        <div className="flex justify-between items-center mb-5">
+      <Card className="p-4 sm:p-6 border-l-4 border-l-rose">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-5">
           <SectionHeader icon={Home} title="Household Services Valuation" subtitle="Loss of domestic capacity" />
-          <label className="flex items-center gap-2 text-sm font-bold text-foreground bg-muted px-4 py-2 rounded-lg cursor-pointer">
+          <label className="flex items-center gap-3 text-sm font-bold text-foreground bg-muted px-4 py-3 sm:py-2 rounded-lg cursor-pointer min-h-[48px] touch-manipulation active:scale-[0.98]">
             <input 
               type="checkbox" 
               checked={hhServices.active} 
               onChange={e => setHhServices({...hhServices, active: e.target.checked})} 
-              className="w-5 h-5 rounded" 
+              className="w-6 h-6 sm:w-5 sm:h-5 rounded" 
             />
-            Include in Analysis
+            <span>Include in Analysis</span>
           </label>
         </div>
         
         {hhServices.active ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <InputGroup 
                 label="Lost Hours Per Week" 
                 value={hhServices.hoursPerWeek} 
@@ -53,7 +53,7 @@ export const HouseholdStep: React.FC<HouseholdStepProps> = ({
                 onChange={v => setHhServices({...hhServices, hourlyRate: parseFloat(v) || 0})} 
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <InputGroup 
                 label="Growth Rate" 
                 suffix="%" 
@@ -68,18 +68,18 @@ export const HouseholdStep: React.FC<HouseholdStepProps> = ({
               />
             </div>
             
-            <div className="bg-rose/10 rounded-xl p-6 text-center mt-6">
-              <span className="block text-[10px] uppercase font-bold text-rose mb-2">Total Household Services (Present Value)</span>
-              <span className="font-bold text-rose text-3xl">{fmtUSD(hhsData.totalPV)}</span>
+            <div className="bg-rose/10 rounded-xl p-4 sm:p-6 text-center mt-4 sm:mt-6">
+              <span className="block text-[10px] sm:text-[11px] uppercase font-bold text-rose mb-2">Total Household Services (Present Value)</span>
+              <span className="font-bold text-rose text-2xl sm:text-3xl">{fmtUSD(hhsData.totalPV)}</span>
               <span className="block text-sm text-muted-foreground mt-2">
                 Nominal Total: {fmtUSD(hhsData.totalNom)}
               </span>
             </div>
           </div>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            <Home className="w-16 h-16 mx-auto mb-4 opacity-30" />
-            <p className="text-lg">Household services are not included</p>
+          <div className="text-center py-10 sm:py-12 text-muted-foreground">
+            <Home className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 opacity-30" />
+            <p className="text-base sm:text-lg">Household services are not included</p>
             <p className="text-sm mt-1">Toggle the checkbox above to include this damage category</p>
           </div>
         )}

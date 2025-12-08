@@ -80,7 +80,7 @@ export const NarrativesStep: React.FC<NarrativesStepProps> = ({ caseInfo, setCas
           size="sm"
           onClick={() => generateNarrative(field)}
           disabled={generatingField !== null}
-          className="h-6 text-[10px] gap-1 text-primary hover:text-primary px-2"
+          className="h-9 min-w-[44px] text-[10px] gap-1 text-primary hover:text-primary px-3 touch-manipulation"
         >
           {generatingField === field ? (
             <>
