@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
-import { FileText, FileDown, Download, Loader2, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { FileText, FileDown, Download, Loader2, AlertTriangle, CheckCircle2, ArrowRight, ChevronDown, Briefcase, HeartPulse, Target, Home } from 'lucide-react';
 import { CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection } from '../types';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { exportSectionToWord, ExportSection } from '../exportUtils';
 
 export interface ValidationCheck {
   id: string;
@@ -35,6 +37,8 @@ interface ReportStepProps {
   onExportWord: () => void;
   fmtUSD: (n: number) => string;
   fmtPct: (n: number) => string;
+  baseCalendarYear: number;
+  ageAtInjury: number;
 }
 
 export const ReportStep: React.FC<ReportStepProps> = ({
@@ -61,8 +65,13 @@ export const ReportStep: React.FC<ReportStepProps> = ({
   onExportPdf,
   onExportWord,
   fmtUSD,
-  fmtPct
+  fmtPct,
+  baseCalendarYear,
+  ageAtInjury
 }) => {
+  const [sectionExportsOpen, setSectionExportsOpen] = useState(false);
+  const [exportingSection, setExportingSection] = useState<ExportSection | null>(null);
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '[Date]';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -97,6 +106,37 @@ export const ReportStep: React.FC<ReportStepProps> = ({
     summary: 5,
     report: 6
   };
+
+  const handleExportSection = async (section: ExportSection) => {
+    setExportingSection(section);
+    try {
+      await exportSectionToWord(section, {
+        caseInfo,
+        earningsParams,
+        projection,
+        hhServices,
+        hhsData,
+        lcpItems,
+        lcpData,
+        algebraic,
+        dateCalc,
+        scenarioProjections,
+        isUnionMode,
+        baseCalendarYear,
+        ageAtInjury,
+        fmtUSD,
+      });
+    } finally {
+      setExportingSection(null);
+    }
+  };
+
+  const sectionExportButtons: { section: ExportSection; label: string; icon: React.ElementType; disabled: boolean }[] = [
+    { section: 'earnings', label: 'Earnings Schedule', icon: Briefcase, disabled: false },
+    { section: 'scenarios', label: 'Scenario Comparison', icon: Target, disabled: scenarioProjections.length === 0 },
+    { section: 'lcp', label: 'Life Care Plan', icon: HeartPulse, disabled: lcpItems.length === 0 },
+    { section: 'household', label: 'Household Services', icon: Home, disabled: !hhServices.active },
+  ];
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -160,7 +200,7 @@ export const ReportStep: React.FC<ReportStepProps> = ({
       </div>
 
       {/* Export Buttons */}
-      <div className="text-center mb-8 print:hidden">
+      <div className="text-center mb-6 print:hidden">
         <h2 className="text-2xl font-bold text-foreground">Generate Report</h2>
         <p className="text-muted-foreground mt-1">Export your complete economic appraisal report</p>
         <div className="flex gap-3 justify-center mt-6 flex-wrap">
@@ -179,6 +219,47 @@ export const ReportStep: React.FC<ReportStepProps> = ({
         {!allValid && (
           <p className="text-xs text-destructive mt-3">Complete all required fields above to enable export</p>
         )}
+      </div>
+
+      {/* Section Export Options */}
+      <div className="print:hidden mb-6">
+        <Collapsible open={sectionExportsOpen} onOpenChange={setSectionExportsOpen}>
+          <CollapsibleTrigger className="w-full bg-muted border border-border rounded-lg p-4 flex items-center justify-between hover:bg-muted/80 transition-colors">
+            <div className="flex items-center gap-2">
+              <Download className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-bold text-foreground">Export Individual Sections</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Word documents for specific sections</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${sectionExportsOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="border border-t-0 border-border rounded-b-lg p-4 bg-background">
+              <p className="text-xs text-muted-foreground mb-4">
+                Export individual sections as separate Word documents for modularity and focused review.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {sectionExportButtons.map(({ section, label, icon: Icon, disabled }) => (
+                  <button
+                    key={section}
+                    onClick={() => handleExportSection(section)}
+                    disabled={disabled || exportingSection === section}
+                    className="flex flex-col items-center gap-2 p-4 rounded-lg border border-border bg-card hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {exportingSection === section ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    ) : (
+                      <Icon className="w-5 h-5 text-primary" />
+                    )}
+                    <span className="text-xs font-medium text-center">{label}</span>
+                    {disabled && <span className="text-[10px] text-muted-foreground">No data</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <div className="print:hidden bg-muted border border-border rounded-lg p-4 mb-6">

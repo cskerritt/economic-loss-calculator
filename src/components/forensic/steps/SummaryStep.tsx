@@ -59,6 +59,9 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   const [openScenarioSchedules, setOpenScenarioSchedules] = useState<Record<string, boolean>>({});
   const [lcpScheduleOpen, setLcpScheduleOpen] = useState(false);
   const [hhsScheduleOpen, setHhsScheduleOpen] = useState(false);
+  const [scenarioTableOpen, setScenarioTableOpen] = useState(true);
+  const [damageScheduleOpen, setDamageScheduleOpen] = useState(true);
+  const [chartsOpen, setChartsOpen] = useState(true);
   const activeScenario = scenarioProjections.find((s) => s.id === selectedScenario);
 
   // Compute detailed schedules for each scenario
@@ -270,110 +273,117 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
       {scenarioProjections.length > 0 && (
         <>
           <Card className="overflow-hidden">
-            <div className="bg-muted border-b border-border p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-amber-500" />
-                <span className="text-sm font-bold uppercase text-muted-foreground">Retirement Scenario Comparison</span>
-              </div>
-              <span className="text-xs text-muted-foreground">Check scenarios to include in report</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead className="bg-muted text-muted-foreground">
-                  <tr>
-                    <th className="p-3 text-center font-bold w-12">Include</th>
-                    <th className="p-3 text-left font-bold">Scenario</th>
-                    <th className="p-3 text-right font-bold">Ret. Age</th>
-                    <th className="p-3 text-right font-bold">YFS</th>
-                    <th className="p-3 text-right font-bold">WLF</th>
-                    <th className="p-3 text-right font-bold">Past Loss</th>
-                    <th className="p-3 text-right font-bold">Future (PV)</th>
-                    <th className="p-3 text-right font-bold">Earnings Total</th>
-                    <th className="p-3 text-right font-bold bg-primary/10">Grand Total</th>
-                    <th className="p-3 text-center font-bold">YOY</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {scenarioProjections.map(scenario => (
-                    <React.Fragment key={scenario.id}>
-                      <tr className={scenario.id === selectedScenario ? 'bg-primary/10' : 'hover:bg-muted/50'}>
-                        <td className="p-3 text-center">
-                          <Checkbox
-                            checked={scenario.included}
-                            onCheckedChange={() => onToggleScenarioIncluded(scenario.id)}
-                            className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
-                          />
-                        </td>
-                        <td className="p-3 text-left">
-                          <span className={scenario.id === selectedScenario ? 'font-bold text-primary' : ''}>
-                            {scenario.label}
-                          </span>
-                          {scenario.id === selectedScenario && (
-                            <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
-                          )}
-                        </td>
-                        <td className="p-3 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
-                        <td className="p-3 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
-                        <td className="p-3 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
-                        <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
-                        <td className="p-3 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
-                        <td className="p-3 text-right font-mono font-bold">{fmtUSD(scenario.totalEarningsLoss)}</td>
-                        <td className="p-3 text-right font-mono font-bold text-primary bg-primary/5">{fmtUSD(scenario.grandTotal)}</td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => toggleScenarioSchedule(scenario.id)}
-                            className="text-xs text-primary hover:underline flex items-center gap-1 mx-auto"
-                          >
-                            {openScenarioSchedules[scenario.id] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                            View
-                          </button>
-                        </td>
+            <Collapsible open={scenarioTableOpen} onOpenChange={setScenarioTableOpen}>
+              <CollapsibleTrigger className="w-full bg-muted border-b border-border p-3 flex items-center justify-between hover:bg-muted/80 transition-colors">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm font-bold uppercase text-muted-foreground">Retirement Scenario Comparison</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground hidden sm:inline">Check scenarios to include in report</span>
+                  {scenarioTableOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="bg-muted text-muted-foreground">
+                      <tr>
+                        <th className="p-3 text-center font-bold w-12">Include</th>
+                        <th className="p-3 text-left font-bold">Scenario</th>
+                        <th className="p-3 text-right font-bold hidden md:table-cell">Ret. Age</th>
+                        <th className="p-3 text-right font-bold hidden md:table-cell">YFS</th>
+                        <th className="p-3 text-right font-bold hidden lg:table-cell">WLF</th>
+                        <th className="p-3 text-right font-bold hidden lg:table-cell">Past Loss</th>
+                        <th className="p-3 text-right font-bold hidden md:table-cell">Future (PV)</th>
+                        <th className="p-3 text-right font-bold hidden lg:table-cell">Earnings Total</th>
+                        <th className="p-3 text-right font-bold bg-primary/10">Grand Total</th>
+                        <th className="p-3 text-center font-bold">YOY</th>
                       </tr>
-                      {openScenarioSchedules[scenario.id] && (
-                        <tr>
-                          <td colSpan={10} className="p-0">
-                            <div className="bg-muted/50 p-4 border-t border-border">
-                              <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">
-                                Year-Over-Year Schedule: {scenario.label}
-                              </h4>
-                              <div className="overflow-x-auto max-h-[300px]">
-                                <table className="w-full text-xs border-collapse">
-                                  <thead className="bg-background sticky top-0">
-                                    <tr>
-                                      <th className="p-2 text-left border border-border">Year #</th>
-                                      <th className="p-2 text-left border border-border">Calendar Year</th>
-                                      <th className="p-2 text-right border border-border">Gross Earnings</th>
-                                      <th className="p-2 text-right border border-border">Net Loss</th>
-                                      <th className="p-2 text-right border border-border">Present Value</th>
-                                      <th className="p-2 text-right border border-border">Cumulative PV</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {scenarioSchedules[scenario.id]?.map((row) => (
-                                      <tr key={row.yearNum} className="hover:bg-background/50">
-                                        <td className="p-2 border border-border">{row.yearNum}</td>
-                                        <td className="p-2 border border-border">{row.calendarYear}</td>
-                                        <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.grossEarnings)}</td>
-                                        <td className="p-2 text-right border border-border font-mono text-primary">{fmtUSD(row.netLoss)}</td>
-                                        <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.presentValue)}</td>
-                                        <td className="p-2 text-right border border-border font-mono font-bold">{fmtUSD(row.cumPV)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
-              <strong>Note:</strong> Grand Total includes earnings loss, household services (if enabled), and life care plan costs. Only checked scenarios will appear in the exported report.
-            </div>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {scenarioProjections.map(scenario => (
+                        <React.Fragment key={scenario.id}>
+                          <tr className={scenario.id === selectedScenario ? 'bg-primary/10' : 'hover:bg-muted/50'}>
+                            <td className="p-3 text-center">
+                              <Checkbox
+                                checked={scenario.included}
+                                onCheckedChange={() => onToggleScenarioIncluded(scenario.id)}
+                                className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                              />
+                            </td>
+                            <td className="p-3 text-left">
+                              <span className={scenario.id === selectedScenario ? 'font-bold text-primary' : ''}>
+                                {scenario.label}
+                              </span>
+                              {scenario.id === selectedScenario && (
+                                <span className="ml-2 text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">ACTIVE</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right font-mono hidden md:table-cell">{scenario.retirementAge.toFixed(1)}</td>
+                            <td className="p-3 text-right font-mono hidden md:table-cell">{scenario.yfs.toFixed(2)}</td>
+                            <td className="p-3 text-right font-mono hidden lg:table-cell">{scenario.wlfPercent.toFixed(2)}%</td>
+                            <td className="p-3 text-right font-mono hidden lg:table-cell">{fmtUSD(scenario.totalPastLoss)}</td>
+                            <td className="p-3 text-right font-mono hidden md:table-cell">{fmtUSD(scenario.totalFuturePV)}</td>
+                            <td className="p-3 text-right font-mono font-bold hidden lg:table-cell">{fmtUSD(scenario.totalEarningsLoss)}</td>
+                            <td className="p-3 text-right font-mono font-bold text-primary bg-primary/5">{fmtUSD(scenario.grandTotal)}</td>
+                            <td className="p-3 text-center">
+                              <button
+                                onClick={() => toggleScenarioSchedule(scenario.id)}
+                                className="text-xs text-primary hover:underline flex items-center gap-1 mx-auto"
+                              >
+                                {openScenarioSchedules[scenario.id] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                <span className="hidden sm:inline">View</span>
+                              </button>
+                            </td>
+                          </tr>
+                          {openScenarioSchedules[scenario.id] && (
+                            <tr>
+                              <td colSpan={10} className="p-0">
+                                <div className="bg-muted/50 p-4 border-t border-border">
+                                  <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">
+                                    Year-Over-Year Schedule: {scenario.label}
+                                  </h4>
+                                  <div className="overflow-x-auto max-h-[300px]">
+                                    <table className="w-full text-xs border-collapse">
+                                      <thead className="bg-background sticky top-0">
+                                        <tr>
+                                          <th className="p-2 text-left border border-border">Year #</th>
+                                          <th className="p-2 text-left border border-border">Calendar Year</th>
+                                          <th className="p-2 text-right border border-border">Gross Earnings</th>
+                                          <th className="p-2 text-right border border-border">Net Loss</th>
+                                          <th className="p-2 text-right border border-border">Present Value</th>
+                                          <th className="p-2 text-right border border-border">Cumulative PV</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {scenarioSchedules[scenario.id]?.map((row) => (
+                                          <tr key={row.yearNum} className="hover:bg-background/50">
+                                            <td className="p-2 border border-border">{row.yearNum}</td>
+                                            <td className="p-2 border border-border">{row.calendarYear}</td>
+                                            <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.grossEarnings)}</td>
+                                            <td className="p-2 text-right border border-border font-mono text-primary">{fmtUSD(row.netLoss)}</td>
+                                            <td className="p-2 text-right border border-border font-mono">{fmtUSD(row.presentValue)}</td>
+                                            <td className="p-2 text-right border border-border font-mono font-bold">{fmtUSD(row.cumPV)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="p-3 bg-muted/50 text-xs text-muted-foreground">
+                  <strong>Note:</strong> Grand Total includes earnings loss, household services (if enabled), and life care plan costs. Only checked scenarios will appear in the exported report.
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
 
           {/* Earnings Loss Trend Chart */}
