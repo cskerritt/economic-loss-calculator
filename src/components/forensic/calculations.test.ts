@@ -102,6 +102,267 @@ describe("computeAlgebraic", () => {
   });
 });
 
+/**
+ * Tinari Algebraic Method Tests
+ * 
+ * The Tinari formula is:
+ * AIF = {[((GE × WLF) × (1 - UF)) × (1 + FB)] - [(GE × WLF) × (1 - UF)] × TL} × (1 - PC)
+ * 
+ * Step-by-step breakdown:
+ * 1. Start with Gross Earnings (GE) = 100%
+ * 2. × Work Life Factor (WLF) = Worklife-Adjusted Base
+ * 3. × (1 - Unemployment Factor) = Unemployment-Adjusted Base
+ * 4. × (1 + Fringe Benefits) = Gross Compensation with Fringes
+ * 5. - Tax Liabilities (on base earnings only, NOT on fringe benefits)
+ * 6. × (1 - Personal Consumption) = Adjusted Income Factor (AIF) [for wrongful death]
+ * 
+ * Key insight: Fringe benefits are NOT subject to income taxes (pre-tax benefits like 401k, health insurance)
+ */
+describe("computeAlgebraic - Tinari Method", () => {
+  const dateCalc = { ageInjury: "0", ageTrial: "0", currentAge: "0", pastYears: 0, derivedYFS: 25 };
+
+  it("implements Tinari formula: taxes apply only to base earnings, not fringe benefits", () => {
+    // Example from Tinari paper (simplified)
+    // GE = $100,000, WLF = 0.919, UF = 3.5%, FB = 21.5%, Tax = 12%
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 100000,
+      wle: 22.975, // Results in WLF = 0.919 when derivedYFS = 25
+      fringeRate: 21.5,
+      unemploymentRate: 3.5,
+      uiReplacementRate: 50,
+      fedTaxRate: 8,
+      stateTaxRate: 4,
+      isWrongfulDeath: false,
+    };
+
+    const algebraic = computeAlgebraic(params, dateCalc, false);
+    
+    // Step 1: WLF = WLE / YFS = 22.975 / 25 = 0.919
+    expect(algebraic.wlf).toBeCloseTo(0.919, 3);
+    
+    // Step 2: Worklife-Adjusted Base = 100% × 0.919 = 91.9%
+    expect(algebraic.worklifeAdjustedBase).toBeCloseTo(0.919, 3);
+    
+    // Step 3: Unemployment Factor = 3.5% × (1 - 50%) = 1.75%
+    // Unemployment-Adjusted Base = 91.9% × (1 - 1.75%) = 90.29%
+    const expectedUnempFactor = 0.035 * (1 - 0.5); // 1.75%
+    expect(algebraic.unemploymentAdjustedBase).toBeCloseTo(0.919 * (1 - expectedUnempFactor), 4);
+    
+    // Step 4: Gross Compensation = Unemp-Adjusted × (1 + FB) = 90.29% × 1.215 = 109.70%
+    expect(algebraic.fringeFactor).toBeCloseTo(1.215, 3);
+    expect(algebraic.grossCompensationWithFringes).toBeCloseTo(
+      algebraic.unemploymentAdjustedBase * 1.215, 4
+    );
+    
+    // Step 5: Tax only on base (not fringe): Tax = Unemp-Adjusted × 12% = 90.29% × 0.12 = 10.83%
+    expect(algebraic.taxOnBaseEarnings).toBeCloseTo(
+      algebraic.unemploymentAdjustedBase * 0.12, 4
+    );
+    
+    // Step 6: After-Tax = Gross Comp - Tax on Base = 109.70% - 10.83% = 98.87%
+    expect(algebraic.afterTaxCompensation).toBeCloseTo(
+      algebraic.grossCompensationWithFringes - algebraic.taxOnBaseEarnings, 4
+    );
+    
+    // Final AIF (no personal consumption for personal injury)
+    expect(algebraic.era1PersonalConsumptionFactor).toBe(0);
+    expect(algebraic.fullMultiplier).toBeCloseTo(algebraic.afterTaxCompensation, 4);
+  });
+
+  it("applies personal consumption deduction for wrongful death cases", () => {
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 100000,
+      wle: 20,
+      fringeRate: 20,
+      unemploymentRate: 5,
+      uiReplacementRate: 50,
+      fedTaxRate: 15,
+      stateTaxRate: 5,
+      isWrongfulDeath: true,
+      era1PersonalConsumption: 25, // 25% personal consumption
+      era2PersonalConsumption: 20,
+    };
+
+    const algebraic = computeAlgebraic(params, dateCalc, false);
+    
+    // WLF = 20/25 = 0.8
+    expect(algebraic.wlf).toBeCloseTo(0.8, 4);
+    
+    // Verify personal consumption factors are captured
+    expect(algebraic.era1PersonalConsumptionFactor).toBeCloseTo(0.25, 4);
+    expect(algebraic.era2PersonalConsumptionFactor).toBeCloseTo(0.20, 4);
+    
+    // AIF = AfterTax × (1 - PC)
+    const afterTaxBeforePC = algebraic.afterTaxCompensation;
+    expect(algebraic.era1AIF).toBeCloseTo(afterTaxBeforePC * (1 - 0.25), 4);
+    expect(algebraic.era2AIF).toBeCloseTo(afterTaxBeforePC * (1 - 0.20), 4);
+    
+    // fullMultiplier should use era1AIF (primary)
+    expect(algebraic.fullMultiplier).toBeCloseTo(algebraic.era1AIF, 4);
+  });
+
+  it("handles era-based wage growth with different rates", () => {
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 80000,
+      wle: 20,
+      useEraSplit: true,
+      eraSplitYear: 2024,
+      era1WageGrowth: 3,
+      era2WageGrowth: 2,
+      fringeRate: 15,
+      unemploymentRate: 4,
+      uiReplacementRate: 40,
+      fedTaxRate: 12,
+      stateTaxRate: 3,
+      isWrongfulDeath: false,
+    };
+
+    const algebraic = computeAlgebraic(params, dateCalc, false);
+    
+    // Verify era-specific AIFs are calculated
+    expect(algebraic.era1AIF).toBeDefined();
+    expect(algebraic.era2AIF).toBeDefined();
+    
+    // Without personal consumption, era1AIF and era2AIF should be equal
+    expect(algebraic.era1AIF).toBeCloseTo(algebraic.era2AIF, 4);
+    expect(algebraic.era1AIF).toBeCloseTo(algebraic.afterTaxCompensation, 4);
+  });
+
+  it("calculates union mode with flat fringe amounts correctly", () => {
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 75000,
+      wle: 18,
+      fringeRate: 0, // ignored in union mode
+      pension: 8000,
+      healthWelfare: 12000,
+      annuity: 5000,
+      clothingAllowance: 500,
+      otherBenefits: 1500,
+      unemploymentRate: 4,
+      uiReplacementRate: 45,
+      fedTaxRate: 18,
+      stateTaxRate: 6,
+      isWrongfulDeath: false,
+    };
+
+    const algebraic = computeAlgebraic(params, dateCalc, true);
+    
+    // Total flat fringes = 8000 + 12000 + 5000 + 500 + 1500 = 27000
+    expect(algebraic.flatFringeAmount).toBe(27000);
+    
+    // Fringe factor = (75000 + 27000) / 75000 = 1.36
+    expect(algebraic.fringeFactor).toBeCloseTo(1.36, 4);
+    
+    // WLF = 18/25 = 0.72
+    expect(algebraic.wlf).toBeCloseTo(0.72, 4);
+  });
+
+  it("handles zero values gracefully", () => {
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 50000,
+      wle: 15,
+      fringeRate: 0,
+      unemploymentRate: 0,
+      uiReplacementRate: 0,
+      fedTaxRate: 0,
+      stateTaxRate: 0,
+      isWrongfulDeath: false,
+    };
+
+    const algebraic = computeAlgebraic(params, dateCalc, false);
+    
+    // WLF = 15/25 = 0.6
+    expect(algebraic.wlf).toBeCloseTo(0.6, 4);
+    
+    // No unemployment, no tax, no fringe = 60% AIF
+    expect(algebraic.unemploymentAdjustedBase).toBeCloseTo(0.6, 4);
+    expect(algebraic.fringeFactor).toBe(1);
+    expect(algebraic.grossCompensationWithFringes).toBeCloseTo(0.6, 4);
+    expect(algebraic.taxOnBaseEarnings).toBe(0);
+    expect(algebraic.afterTaxCompensation).toBeCloseTo(0.6, 4);
+    expect(algebraic.fullMultiplier).toBeCloseTo(0.6, 4);
+  });
+
+  it("verifies tax is NOT applied to fringe benefits (Tinari key principle)", () => {
+    // This test explicitly validates that taxes are only on base earnings
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 100000,
+      wle: 25, // WLF = 1.0 for simplicity
+      fringeRate: 30, // 30% fringe benefits
+      unemploymentRate: 0, // no unemployment for simplicity
+      uiReplacementRate: 0,
+      fedTaxRate: 20,
+      stateTaxRate: 10, // 30% total tax
+      isWrongfulDeath: false,
+    };
+
+    const algebraic = computeAlgebraic(params, { ...dateCalc, derivedYFS: 25 }, false);
+    
+    // WLF = 25/25 = 1.0
+    expect(algebraic.wlf).toBeCloseTo(1.0, 4);
+    
+    // Unemployment-adjusted = 100% (no unemployment)
+    expect(algebraic.unemploymentAdjustedBase).toBeCloseTo(1.0, 4);
+    
+    // Gross comp = 100% × 1.30 = 130%
+    expect(algebraic.grossCompensationWithFringes).toBeCloseTo(1.30, 4);
+    
+    // Tax on base only = 100% × 30% = 30%
+    expect(algebraic.taxOnBaseEarnings).toBeCloseTo(0.30, 4);
+    
+    // After-tax = 130% - 30% = 100%
+    // (This shows fringes are preserved, taxes only hit the base)
+    expect(algebraic.afterTaxCompensation).toBeCloseTo(1.00, 4);
+    
+    // If taxes were incorrectly applied to the full compensation (wrong method):
+    // Wrong: 130% - (130% × 30%) = 130% - 39% = 91% ← INCORRECT
+    // Correct (Tinari): 130% - (100% × 30%) = 130% - 30% = 100% ← CORRECT
+  });
+
+  it("calculates wrongful death with era split and different consumption rates", () => {
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 120000,
+      wle: 20,
+      useEraSplit: true,
+      eraSplitYear: 2023,
+      era1WageGrowth: 3,
+      era2WageGrowth: 2.5,
+      fringeRate: 18,
+      unemploymentRate: 3,
+      uiReplacementRate: 50,
+      fedTaxRate: 22,
+      stateTaxRate: 5,
+      isWrongfulDeath: true,
+      era1PersonalConsumption: 30,
+      era2PersonalConsumption: 25,
+    };
+
+    const algebraic = computeAlgebraic(params, dateCalc, false);
+    
+    // WLF = 20/25 = 0.8
+    expect(algebraic.wlf).toBeCloseTo(0.8, 4);
+    
+    // Personal consumption factors
+    expect(algebraic.era1PersonalConsumptionFactor).toBeCloseTo(0.30, 4);
+    expect(algebraic.era2PersonalConsumptionFactor).toBeCloseTo(0.25, 4);
+    
+    // Era 1 AIF < Era 2 AIF (higher consumption in era 1)
+    expect(algebraic.era1AIF).toBeLessThan(algebraic.era2AIF);
+    
+    // Verify the relationship: era2AIF = afterTax × (1 - 0.25) vs era1AIF = afterTax × (1 - 0.30)
+    const afterTax = algebraic.afterTaxCompensation;
+    expect(algebraic.era1AIF).toBeCloseTo(afterTax * 0.70, 4);
+    expect(algebraic.era2AIF).toBeCloseTo(afterTax * 0.75, 4);
+  });
+});
+
 describe("computeProjection", () => {
   it("handles partial past years, manual actuals, and future PV", () => {
     const caseInfo: CaseInfo = { ...DEFAULT_CASE_INFO, dateOfInjury: "2020-01-01T12:00:00Z" };
