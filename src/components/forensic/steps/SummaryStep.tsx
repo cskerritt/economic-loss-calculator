@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Table, Copy, Check, Target, BarChart3, TrendingUp, ChevronDown, ChevronRight, HeartPulse, Home, Download, FileSpreadsheet, Archive } from 'lucide-react';
+import { Table, Copy, Check, Target, BarChart3, TrendingUp, ChevronDown, ChevronRight, HeartPulse, Home, Download, FileSpreadsheet, Archive, Loader2 } from 'lucide-react';
 import { Card } from '../ui';
 import { Projection, HhServices, HhsData, LcpData, Algebraic, ScenarioProjection, CaseInfo, EarningsParams, LcpItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList, LineChart, Line, Legend, AreaChart, Area } from 'recharts';
@@ -74,7 +74,20 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
   const [damageScheduleOpen, setDamageScheduleOpen] = useState(true);
   const [chartsOpen, setChartsOpen] = useState(true);
   const [showMobileCards, setShowMobileCards] = useState(true);
+  const [isExportingZip, setIsExportingZip] = useState(false);
   const activeScenario = scenarioProjections.find((s) => s.id === selectedScenario);
+
+  // Handle ZIP export with loading state
+  const handleExportZip = async () => {
+    setIsExportingZip(true);
+    try {
+      await exportAllSchedulesToZip(csvExportParams);
+    } catch (error) {
+      console.error('Failed to export ZIP:', error);
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
 
   // CSV export params object
   const csvExportParams = useMemo(() => ({
@@ -316,11 +329,16 @@ export const SummaryStep: React.FC<SummaryStepProps> = ({
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={() => exportAllSchedulesToZip(csvExportParams)}
+                      onClick={handleExportZip}
+                      disabled={isExportingZip}
                       className="h-8 text-xs"
                     >
-                      <Archive className="w-3 h-3 mr-1" />
-                      Export All (ZIP)
+                      {isExportingZip ? (
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <Archive className="w-3 h-3 mr-1" />
+                      )}
+                      {isExportingZip ? 'Exporting...' : 'Export All (ZIP)'}
                     </Button>
                     <Button
                       variant="outline"
