@@ -59,6 +59,15 @@ export interface EarningsParams {
   uiReplacementRate: number;
   fedTaxRate: number;
   stateTaxRate: number;
+  // Era-based calculations (Tinari method)
+  useEraSplit: boolean;
+  eraSplitYear: number; // Calendar year dividing Era 1 (Past) from Era 2 (Future)
+  era1WageGrowth: number;
+  era2WageGrowth: number;
+  // Wrongful death support
+  isWrongfulDeath: boolean;
+  era1PersonalConsumption: number; // Personal consumption rate for Era 1 (%)
+  era2PersonalConsumption: number; // Personal consumption rate for Era 2 (%)
 }
 
 export interface HhServices {
@@ -102,6 +111,17 @@ export interface Algebraic {
   yfs: number;
   flatFringeAmount: number;
   combinedTaxRate: number;
+  // Era-based Tinari method factors
+  era1PersonalConsumptionFactor: number;
+  era2PersonalConsumptionFactor: number;
+  era1AIF: number; // Adjusted Income Factor for Era 1
+  era2AIF: number; // Adjusted Income Factor for Era 2
+  // Tinari step-by-step breakdown
+  worklifeAdjustedBase: number; // 100% × WLF
+  unemploymentAdjustedBase: number; // × (1 - UF)
+  grossCompensationWithFringes: number; // × (1 + FB)
+  taxOnBaseEarnings: number; // Tax liability on base (not fringes)
+  afterTaxCompensation: number; // After-tax
 }
 
 export interface PastScheduleRow {
@@ -216,7 +236,16 @@ export const DEFAULT_EARNINGS_PARAMS: EarningsParams = {
   unemploymentRate: 4.2,
   uiReplacementRate: 40.0,
   fedTaxRate: 15.0,
-  stateTaxRate: 4.5
+  stateTaxRate: 4.5,
+  // Era-based calculations
+  useEraSplit: false,
+  eraSplitYear: new Date().getFullYear(),
+  era1WageGrowth: 3.50,
+  era2WageGrowth: 3.50,
+  // Wrongful death
+  isWrongfulDeath: false,
+  era1PersonalConsumption: 25.0,
+  era2PersonalConsumption: 20.0,
 };
 
 export const RETIREMENT_SCENARIOS = [

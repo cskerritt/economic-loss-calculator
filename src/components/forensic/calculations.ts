@@ -58,6 +58,22 @@ export function computeWorkLifeFactor(earningsParams: EarningsParams, derivedYFS
   return (earningsParams.wle / derivedYFS) * 100;
 }
 
+/**
+ * Tinari Algebraic Method Implementation
+ * 
+ * Formula: AIF = {[((GE × WLF) × (1 - UF)) × (1 + FB)] - [(GE × WLF) × (1 - UF)] × TL} × (1 - PC)
+ * 
+ * Key insight: Fringe benefits are added AFTER unemployment adjustment, but taxes are only 
+ * applied to the BASE EARNINGS portion (not on fringe benefits, since they're typically pre-tax).
+ * 
+ * Step-by-step:
+ * 1. Start with 100% of Gross Earnings
+ * 2. × Work Life Factor = Worklife-Adjusted Base
+ * 3. × (1 - Unemployment Factor) = Unemployment-Adjusted Base
+ * 4. × (1 + Fringe Benefits) = Gross Compensation with Fringes
+ * 5. - Tax Liabilities (on base earnings only, NOT on fringe benefits)
+ * 6. × (1 - Personal Consumption) = Adjusted Income Factor (AIF) [for wrongful death]
+ */
 export function computeAlgebraic(
   earningsParams: EarningsParams,
   dateCalc: DateCalc,
@@ -65,10 +81,16 @@ export function computeAlgebraic(
 ): Algebraic {
   const yfs = dateCalc.derivedYFS;
   const wlf = yfs > 0 ? earningsParams.wle / yfs : 0;
+  
+  // Unemployment factor: (1 - UF × (1 - UI replacement))
   const unempFactor =
     1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
+  
+  // After-tax factor for base earnings
   const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
+  const combinedTaxRate = 1 - afterTaxFactor;
 
+  // Fringe benefits factor: (1 + FB)
   let fringeFactor = 1;
   let flatFringeAmount = 0;
 
@@ -86,9 +108,34 @@ export function computeAlgebraic(
     fringeFactor = 1 + earningsParams.fringeRate / 100;
   }
 
-  const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
+  // Personal consumption factors (for wrongful death cases)
+  const era1PersonalConsumptionFactor = earningsParams.isWrongfulDeath 
+    ? (1 - earningsParams.era1PersonalConsumption / 100) 
+    : 1;
+  const era2PersonalConsumptionFactor = earningsParams.isWrongfulDeath 
+    ? (1 - earningsParams.era2PersonalConsumption / 100) 
+    : 1;
+
+  // Tinari step-by-step breakdown (as percentages of gross earnings)
+  const worklifeAdjustedBase = wlf; // 100% × WLF
+  const unemploymentAdjustedBase = worklifeAdjustedBase * unempFactor; // × (1 - UF)
+  const grossCompensationWithFringes = unemploymentAdjustedBase * fringeFactor; // × (1 + FB)
+  
+  // CRITICAL: Tax is applied only to the BASE EARNINGS portion, not fringe benefits
+  // Tax liability = (base earnings portion) × tax rate
+  // In the Tinari formula, this means we subtract taxes from the base, not from fringes
+  const taxOnBaseEarnings = unemploymentAdjustedBase * combinedTaxRate;
+  const afterTaxCompensation = grossCompensationWithFringes - taxOnBaseEarnings;
+
+  // Era-specific AIFs (with personal consumption for wrongful death)
+  const era1AIF = afterTaxCompensation * era1PersonalConsumptionFactor;
+  const era2AIF = afterTaxCompensation * era2PersonalConsumptionFactor;
+
+  // Legacy full multiplier (for backward compatibility)
+  // Note: The old formula was incorrect - it applied tax to everything including fringes
+  // New Tinari formula: AIF = [(base × WLF × (1-UF)) × (1+FB)] - [(base × WLF × (1-UF)) × TL] × (1-PC)
+  const fullMultiplier = afterTaxCompensation; // Without personal consumption (PI cases)
   const realizedMultiplier = afterTaxFactor * fringeFactor;
-  const combinedTaxRate = 1 - afterTaxFactor;
 
   return {
     wlf,
@@ -100,6 +147,15 @@ export function computeAlgebraic(
     yfs,
     flatFringeAmount,
     combinedTaxRate,
+    era1PersonalConsumptionFactor,
+    era2PersonalConsumptionFactor,
+    era1AIF,
+    era2AIF,
+    worklifeAdjustedBase,
+    unemploymentAdjustedBase,
+    grossCompensationWithFringes,
+    taxOnBaseEarnings,
+    afterTaxCompensation,
   };
 }
 
@@ -123,16 +179,37 @@ export function computeProjection(
   const startYear = parseDate(caseInfo.dateOfInjury).getFullYear();
   const fullPast = Math.floor(dateCalc.pastYears);
   const partialPast = dateCalc.pastYears % 1;
+  
+  // Determine era split year (defaults to trial year)
+  const eraSplitYear = earningsParams.useEraSplit 
+    ? earningsParams.eraSplitYear 
+    : (caseInfo.dateOfTrial ? parseDate(caseInfo.dateOfTrial).getFullYear() : startYear + fullPast);
 
+  // Use era-specific wage growth if era split is enabled
+  const getWageGrowth = (year: number, isPast: boolean) => {
+    if (!earningsParams.useEraSplit) return earningsParams.wageGrowth;
+    return isPast ? earningsParams.era1WageGrowth : earningsParams.era2WageGrowth;
+  };
+
+  // Get AIF based on era (for wrongful death cases)
+  const getAIF = (isPast: boolean) => {
+    return isPast ? algebraic.era1AIF : algebraic.era2AIF;
+  };
+
+  // Past schedule calculations
   for (let i = 0; i <= fullPast; i++) {
     const fraction =
       i === fullPast && partialPast > 0 ? partialPast : i === fullPast && partialPast === 0 ? 0 : 1;
     if (fraction <= 0) continue;
 
     const currentYear = startYear + i;
-    const growth = Math.pow(1 + earningsParams.wageGrowth / 100, i);
+    const wageGrowthRate = getWageGrowth(currentYear, true);
+    const growth = Math.pow(1 + wageGrowthRate / 100, i);
     const grossBase = earningsParams.baseEarnings * growth * fraction;
-    const netButFor = grossBase * algebraic.fullMultiplier;
+    
+    // Use Era 1 AIF for past losses
+    const aif = getAIF(true);
+    const netButFor = grossBase * aif;
 
     let netActual = 0;
     let grossActual = 0;
@@ -144,7 +221,7 @@ export function computeProjection(
       isManual = true;
     } else {
       grossActual = earningsParams.residualEarnings * growth * fraction;
-      netActual = grossActual * algebraic.fullMultiplier;
+      netActual = grossActual * aif;
     }
 
     const netLoss = netButFor - netActual;
@@ -160,14 +237,19 @@ export function computeProjection(
     });
   }
 
+  // Future schedule calculations
   const futureYears = Math.ceil(algebraic.yfs);
   for (let i = 0; i < futureYears; i++) {
-    const growth = Math.pow(1 + earningsParams.wageGrowth / 100, i);
+    const wageGrowthRate = getWageGrowth(eraSplitYear + i, false);
+    const growth = Math.pow(1 + wageGrowthRate / 100, i);
     const discount = 1 / Math.pow(1 + earningsParams.discountRate / 100, i + 0.5);
     const grossBase = earningsParams.baseEarnings * growth;
-    const netButFor = grossBase * algebraic.fullMultiplier;
+    
+    // Use Era 2 AIF for future losses
+    const aif = getAIF(false);
+    const netButFor = grossBase * aif;
     const grossRes = earningsParams.residualEarnings * growth;
-    const netActual = grossRes * algebraic.fullMultiplier;
+    const netActual = grossRes * aif;
     const netLoss = netButFor - netActual;
     const pv = netLoss * discount;
 
@@ -293,8 +375,9 @@ export function computeScenarioProjections({
     const unempFactor =
       1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
     const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
+    const combinedTaxRate = 1 - afterTaxFactor;
+    
     let fringeFactor = 1;
-
     if (isUnionMode) {
       const flatFringe =
         earningsParams.pension +
@@ -307,7 +390,19 @@ export function computeScenarioProjections({
       fringeFactor = 1 + earningsParams.fringeRate / 100;
     }
 
-    const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
+    // Tinari method: AIF calculation
+    const unemploymentAdjustedBase = wlf * unempFactor;
+    const grossCompensationWithFringes = unemploymentAdjustedBase * fringeFactor;
+    const taxOnBaseEarnings = unemploymentAdjustedBase * combinedTaxRate;
+    const afterTaxCompensation = grossCompensationWithFringes - taxOnBaseEarnings;
+
+    // Personal consumption factors (for wrongful death)
+    const era1PC = earningsParams.isWrongfulDeath ? (1 - earningsParams.era1PersonalConsumption / 100) : 1;
+    const era2PC = earningsParams.isWrongfulDeath ? (1 - earningsParams.era2PersonalConsumption / 100) : 1;
+    
+    const era1AIF = afterTaxCompensation * era1PC;
+    const era2AIF = afterTaxCompensation * era2PC;
+    
     const realizedMultiplier = afterTaxFactor * fringeFactor;
 
     let totalPastLoss = 0;
@@ -315,15 +410,21 @@ export function computeScenarioProjections({
     const fullPast = Math.floor(dateCalc.pastYears);
     const partialPast = dateCalc.pastYears % 1;
 
+    // Era split year
+    const eraSplitYear = earningsParams.useEraSplit 
+      ? earningsParams.eraSplitYear 
+      : (caseInfo.dateOfTrial ? parseDate(caseInfo.dateOfTrial).getFullYear() : startYear + fullPast);
+
     for (let i = 0; i <= fullPast; i++) {
       const fraction =
         i === fullPast && partialPast > 0 ? partialPast : i === fullPast && partialPast === 0 ? 0 : 1;
       if (fraction <= 0) continue;
 
       const currentYear = startYear + i;
-      const growth = Math.pow(1 + earningsParams.wageGrowth / 100, i);
+      const wageGrowthRate = earningsParams.useEraSplit ? earningsParams.era1WageGrowth : earningsParams.wageGrowth;
+      const growth = Math.pow(1 + wageGrowthRate / 100, i);
       const grossBase = earningsParams.baseEarnings * growth * fraction;
-      const netButFor = grossBase * fullMultiplier;
+      const netButFor = grossBase * era1AIF;
 
       let netActual = 0;
       if (pastActuals[currentYear] !== undefined && pastActuals[currentYear] !== "") {
@@ -331,7 +432,7 @@ export function computeScenarioProjections({
         netActual = grossActual * realizedMultiplier;
       } else {
         const grossActual = earningsParams.residualEarnings * growth * fraction;
-        netActual = grossActual * fullMultiplier;
+        netActual = grossActual * era1AIF;
       }
 
       totalPastLoss += netButFor - netActual;
@@ -340,12 +441,13 @@ export function computeScenarioProjections({
     let totalFuturePV = 0;
     const futureYears = Math.ceil(yfs);
     for (let i = 0; i < futureYears; i++) {
-      const growth = Math.pow(1 + earningsParams.wageGrowth / 100, i);
+      const wageGrowthRate = earningsParams.useEraSplit ? earningsParams.era2WageGrowth : earningsParams.wageGrowth;
+      const growth = Math.pow(1 + wageGrowthRate / 100, i);
       const discount = 1 / Math.pow(1 + earningsParams.discountRate / 100, i + 0.5);
       const grossBase = earningsParams.baseEarnings * growth;
-      const netButFor = grossBase * fullMultiplier;
+      const netButFor = grossBase * era2AIF;
       const grossRes = earningsParams.residualEarnings * growth;
-      const netActual = grossRes * fullMultiplier;
+      const netActual = grossRes * era2AIF;
       const netLoss = netButFor - netActual;
       totalFuturePV += netLoss * discount;
     }

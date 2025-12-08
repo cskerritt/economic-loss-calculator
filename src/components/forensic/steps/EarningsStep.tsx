@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Briefcase, TrendingUp, HeartPulse, History, Calendar, Target, AlertCircle } from 'lucide-react';
+import { Briefcase, TrendingUp, HeartPulse, History, Calendar, Target, AlertCircle, Skull, Layers } from 'lucide-react';
 import { Card, SectionHeader, InputGroup } from '../ui';
 import { EarningsParams, DateCalc, Algebraic, RETIREMENT_SCENARIOS } from '../types';
 import { parseDate } from '../calculations';
@@ -24,6 +24,7 @@ interface EarningsStepProps {
   pastActuals: Record<number, string>;
   setPastActuals: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   dateOfInjury: string;
+  dateOfTrial: string;
   dob: string;
   fmtUSD: (n: number) => string;
   fmtPct: (n: number) => string;
@@ -47,6 +48,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
   pastActuals,
   setPastActuals,
   dateOfInjury,
+  dateOfTrial,
   dob,
   fmtUSD,
   fmtPct

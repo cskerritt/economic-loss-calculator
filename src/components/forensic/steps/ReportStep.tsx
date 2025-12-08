@@ -383,40 +383,78 @@ export const ReportStep: React.FC<ReportStepProps> = ({
           )}
         </section>
 
-        {/* AEF Table */}
+        {/* AEF Table - Tinari Algebraic Method */}
         <section className="mb-8">
-          <h2 className="text-lg font-bold uppercase border-b-2 border-slate-900 pb-2 mb-4">Adjusted Earnings Factor (AEF) – Algebraic Method</h2>
+          <h2 className="text-lg font-bold uppercase border-b-2 border-slate-900 pb-2 mb-4">Adjusted Earnings Factor (AEF) – Tinari Algebraic Method</h2>
+          <p className="text-sm mb-4">The Tinari method calculates the Adjusted Income Factor (AIF) using the formula: AIF = {`{[((GE × WLF) × (1 - UF)) × (1 + FB)] - [(GE × WLF) × (1 - UF)] × TL}`} × (1 - PC)</p>
           <table className="w-full text-sm border-collapse mb-4">
             <thead>
               <tr className="bg-slate-100">
+                <th className="p-2 text-left border border-slate-300">Step</th>
                 <th className="p-2 text-left border border-slate-300">Component</th>
-                <th className="p-2 text-right border border-slate-300">Value</th>
+                <th className="p-2 text-right border border-slate-300">Factor</th>
                 <th className="p-2 text-right border border-slate-300">Cumulative</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td className="p-2 border border-slate-300">Work Life Factor (WLF)</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.wlf.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.wlf.toFixed(4)}</td>
+                <td className="p-2 border border-slate-300">1</td>
+                <td className="p-2 border border-slate-300">Gross Earnings Base</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">100.00%</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">100.00%</td>
               </tr>
               <tr>
-                <td className="p-2 border border-slate-300">Net Unemployment Factor</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.unempFactor.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.wlf * algebraic.unempFactor).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300">2</td>
+                <td className="p-2 border border-slate-300">× Work Life Factor (WLF = WLE ÷ YFS)</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.wlf * 100).toFixed(2)}%</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.worklifeAdjustedBase * 100).toFixed(2)}%</td>
               </tr>
               <tr>
-                <td className="p-2 border border-slate-300">After-Tax Factor</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.afterTaxFactor.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.wlf * algebraic.unempFactor * algebraic.afterTaxFactor).toFixed(4)}</td>
+                <td className="p-2 border border-slate-300">3</td>
+                <td className="p-2 border border-slate-300">× (1 - Unemployment Factor)</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.unempFactor * 100).toFixed(2)}%</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.unemploymentAdjustedBase * 100).toFixed(2)}%</td>
               </tr>
               <tr>
-                <td className="p-2 border border-slate-300">Fringe Benefit Factor</td>
-                <td className="p-2 border border-slate-300 text-right font-mono">{algebraic.fringeFactor.toFixed(4)}</td>
-                <td className="p-2 border border-slate-300 text-right font-mono font-bold">{algebraic.fullMultiplier.toFixed(5)}</td>
+                <td className="p-2 border border-slate-300">4</td>
+                <td className="p-2 border border-slate-300">× (1 + Fringe Benefits)</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.fringeFactor * 100).toFixed(2)}%</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.grossCompensationWithFringes * 100).toFixed(2)}%</td>
+              </tr>
+              <tr>
+                <td className="p-2 border border-slate-300">5</td>
+                <td className="p-2 border border-slate-300">− Tax on Base Earnings (not fringes)</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">-{(algebraic.taxOnBaseEarnings * 100).toFixed(2)}%</td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.afterTaxCompensation * 100).toFixed(2)}%</td>
+              </tr>
+              {earningsParams.isWrongfulDeath && (
+                <>
+                  <tr className="bg-rose-50">
+                    <td className="p-2 border border-slate-300">6</td>
+                    <td className="p-2 border border-slate-300">× (1 - Personal Consumption) Era 1</td>
+                    <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.era1PersonalConsumptionFactor * 100).toFixed(2)}%</td>
+                    <td className="p-2 border border-slate-300 text-right font-mono font-bold">{(algebraic.era1AIF * 100).toFixed(2)}%</td>
+                  </tr>
+                  <tr className="bg-rose-50">
+                    <td className="p-2 border border-slate-300">6</td>
+                    <td className="p-2 border border-slate-300">× (1 - Personal Consumption) Era 2</td>
+                    <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.era2PersonalConsumptionFactor * 100).toFixed(2)}%</td>
+                    <td className="p-2 border border-slate-300 text-right font-mono font-bold">{(algebraic.era2AIF * 100).toFixed(2)}%</td>
+                  </tr>
+                </>
+              )}
+              <tr className="bg-slate-100 font-bold">
+                <td colSpan={2} className="p-2 border border-slate-300">ADJUSTED INCOME FACTOR (AIF)</td>
+                <td className="p-2 border border-slate-300 text-right"></td>
+                <td className="p-2 border border-slate-300 text-right font-mono">{(algebraic.fullMultiplier * 100).toFixed(4)}%</td>
               </tr>
             </tbody>
           </table>
+          <p className="text-[10pt] text-slate-600">
+            <strong>Key:</strong> Taxes are applied only to base earnings (Step 5), not to fringe benefits—this is critical to the Tinari method.
+            {earningsParams.isWrongfulDeath && " Personal consumption is deducted in wrongful death cases (Step 6)."}
+            {earningsParams.useEraSplit && ` Era-based calculations use ${earningsParams.era1WageGrowth}% wage growth for past and ${earningsParams.era2WageGrowth}% for future periods.`}
+          </p>
         </section>
 
         {/* Economic Variables */}
