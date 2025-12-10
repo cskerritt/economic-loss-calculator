@@ -1,8 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { FileText, FileDown, Download, Loader2, AlertTriangle, CheckCircle2, ArrowRight, ChevronDown, Briefcase, HeartPulse, Target, Home } from 'lucide-react';
-import { CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection } from '../types';
+import { FileText, FileDown, Download, Loader2, AlertTriangle, CheckCircle2, ArrowRight, ChevronDown, Briefcase, HeartPulse, Target, Home, Copy, FileSpreadsheet, FileJson } from 'lucide-react';
+import { CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection, EconomicLossReport } from '../types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportSectionToWord, ExportSection } from '../exportUtils';
+import { generateReportSnapshot } from '../reportSnapshot';
+import { exportReportToJson, copyReportSummaryToClipboard } from '../jsonExport';
+import { exportReportToExcel } from '../excelExport';
+import { toast } from 'sonner';
 
 export interface ValidationCheck {
   id: string;
@@ -39,6 +43,8 @@ interface ReportStepProps {
   fmtPct: (n: number) => string;
   baseCalendarYear: number;
   ageAtInjury: number;
+  userId?: string;
+  caseId?: string;
 }
 
 export const ReportStep: React.FC<ReportStepProps> = ({
@@ -67,10 +73,16 @@ export const ReportStep: React.FC<ReportStepProps> = ({
   fmtUSD,
   fmtPct,
   baseCalendarYear,
-  ageAtInjury
+  ageAtInjury,
+  userId,
+  caseId
 }) => {
   const [sectionExportsOpen, setSectionExportsOpen] = useState(false);
+  const [dataExportsOpen, setDataExportsOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [exportingSection, setExportingSection] = useState<ExportSection | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExportingJson, setIsExportingJson] = useState(false);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '[Date]';
@@ -128,6 +140,60 @@ export const ReportStep: React.FC<ReportStepProps> = ({
       });
     } finally {
       setExportingSection(null);
+    }
+  };
+
+  // Generate report snapshot for exports
+  const reportSnapshot = useMemo(() => generateReportSnapshot({
+    caseInfo,
+    earningsParams,
+    hhServices,
+    lcpItems,
+    isUnionMode,
+    dateCalc,
+    algebraic,
+    projection,
+    hhsData,
+    lcpData,
+    workLifeFactor,
+    grandTotal,
+    scenarioProjections,
+    selectedScenario,
+    baseCalendarYear,
+    userId,
+    caseId,
+  }), [caseInfo, earningsParams, hhServices, lcpItems, isUnionMode, dateCalc, algebraic, projection, hhsData, lcpData, workLifeFactor, grandTotal, scenarioProjections, selectedScenario, baseCalendarYear, userId, caseId]);
+
+  const handleExportJson = async () => {
+    setIsExportingJson(true);
+    try {
+      exportReportToJson(reportSnapshot);
+      toast.success('JSON export completed');
+    } catch (error) {
+      toast.error('Failed to export JSON');
+    } finally {
+      setIsExportingJson(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true);
+    try {
+      exportReportToExcel(reportSnapshot);
+      toast.success('Excel export completed');
+    } catch (error) {
+      toast.error('Failed to export Excel');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  const handleCopySummary = async () => {
+    try {
+      await copyReportSummaryToClipboard(reportSnapshot);
+      toast.success('Summary copied to clipboard');
+    } catch (error) {
+      toast.error('Failed to copy summary');
     }
   };
 
@@ -203,19 +269,37 @@ export const ReportStep: React.FC<ReportStepProps> = ({
       <div className="text-center mb-6 print:hidden">
         <h2 className="text-xl sm:text-2xl font-bold text-foreground">Generate Report</h2>
         <p className="text-sm text-muted-foreground mt-1">Export your complete economic appraisal report</p>
+        
+        {/* Primary Export Buttons */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center mt-4 sm:mt-6">
           <button onClick={onPrint} disabled={!allValid} className="bg-slate-900 text-white px-5 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]">
-            <FileText className="w-5 h-5" /> Print
+            <FileText className="w-5 h-5" /> Print Report
           </button>
           <button onClick={onExportPdf} disabled={isExportingPdf || !allValid} className="bg-rose-600 text-white px-5 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:bg-rose-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]">
             {isExportingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
-            {isExportingPdf ? 'Exporting...' : 'Export PDF'}
+            {isExportingPdf ? 'Exporting...' : 'Download PDF'}
           </button>
           <button onClick={onExportWord} disabled={isExportingWord || !allValid} className="bg-blue-600 text-white px-5 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]">
             {isExportingWord ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-            {isExportingWord ? 'Exporting...' : 'Export Word'}
+            {isExportingWord ? 'Exporting...' : 'Download Word'}
           </button>
         </div>
+
+        {/* Secondary Export Buttons - Data Formats */}
+        <div className="flex flex-wrap gap-2 justify-center mt-3">
+          <button onClick={handleExportExcel} disabled={isExportingExcel || !allValid} className="bg-emerald-600 text-white px-4 py-2 rounded-full font-medium shadow hover:bg-emerald-700 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {isExportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+            Excel
+          </button>
+          <button onClick={handleExportJson} disabled={isExportingJson || !allValid} className="bg-amber-600 text-white px-4 py-2 rounded-full font-medium shadow hover:bg-amber-700 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {isExportingJson ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileJson className="w-4 h-4" />}
+            JSON
+          </button>
+          <button onClick={handleCopySummary} disabled={!allValid} className="bg-slate-600 text-white px-4 py-2 rounded-full font-medium shadow hover:bg-slate-700 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            <Copy className="w-4 h-4" /> Copy Summary
+          </button>
+        </div>
+
         {!allValid && (
           <p className="text-xs text-destructive mt-3">Complete all required fields above to enable export</p>
         )}
@@ -472,6 +556,52 @@ export const ReportStep: React.FC<ReportStepProps> = ({
             <p><strong>Combined Tax Rate:</strong> {fmtPct(algebraic.combinedTaxRate)}</p>
             <p><strong>Fringe Rate:</strong> {isUnionMode ? `${((algebraic.flatFringeAmount / earningsParams.baseEarnings) * 100).toFixed(1)}% (Union)` : `${earningsParams.fringeRate}% (ECEC)`}</p>
           </div>
+        </section>
+
+        {/* Year-Over-Year Timeline (Collapsible in print, always visible) */}
+        <section className="mb-8">
+          <h2 className="text-lg font-bold uppercase border-b-2 border-slate-900 pb-2 mb-4">Year-Over-Year Earnings Timeline</h2>
+          <p className="text-sm mb-4">The following table shows the projected earnings loss for each year from the date of injury through assumed retirement.</p>
+          
+          {/* Combined Past & Future Table */}
+          <table className="w-full text-[9pt] border-collapse">
+            <thead>
+              <tr className="bg-slate-100">
+                <th className="p-1 text-left border border-slate-300">Year</th>
+                <th className="p-1 text-center border border-slate-300">Calendar</th>
+                <th className="p-1 text-center border border-slate-300">Period</th>
+                <th className="p-1 text-right border border-slate-300">Gross Income</th>
+                <th className="p-1 text-right border border-slate-300">Net Loss</th>
+                <th className="p-1 text-right border border-slate-300">Discount</th>
+                <th className="p-1 text-right border border-slate-300">PV</th>
+                <th className="p-1 text-right border border-slate-300">Cumulative</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reportSnapshot.periods.map((row, idx) => (
+                <tr key={idx} className={row.periodType === 'past' ? 'bg-slate-50' : ''}>
+                  <td className="p-1 border border-slate-300 font-mono">{row.yearNum}</td>
+                  <td className="p-1 border border-slate-300 text-center font-mono">{row.calendarYear}</td>
+                  <td className="p-1 border border-slate-300 text-center text-[8pt]">{row.periodType === 'past' ? 'Past' : 'Future'}</td>
+                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.grossIncome)}</td>
+                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.netLoss)}</td>
+                  <td className="p-1 border border-slate-300 text-right font-mono">{row.discountFactor.toFixed(4)}</td>
+                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.presentValue)}</td>
+                  <td className="p-1 border border-slate-300 text-right font-mono font-bold">{fmtUSD(row.cumulativePV)}</td>
+                </tr>
+              ))}
+              <tr className="bg-slate-100 font-bold">
+                <td colSpan={4} className="p-1 border border-slate-300 text-right">TOTALS</td>
+                <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(projection.totalPastLoss + projection.totalFutureNominal)}</td>
+                <td className="p-1 border border-slate-300"></td>
+                <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(projection.totalPastLoss + projection.totalFuturePV)}</td>
+                <td className="p-1 border border-slate-300"></td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-[9pt] text-slate-600 mt-2">
+            <strong>Note:</strong> Past losses are shown at nominal value (discount factor = 1.0). Future losses are discounted to present value using a {earningsParams.discountRate}% annual rate with mid-year convention.
+          </p>
         </section>
 
         {/* LCP Summary */}

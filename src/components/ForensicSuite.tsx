@@ -809,6 +809,7 @@ export default function ForensicSuite() {
             fmtPct={fmtPct}
             baseCalendarYear={baseCalendarYear}
             ageAtInjury={ageAtInjury}
+            caseId={activeCaseId || undefined}
           />
         );
       default:
