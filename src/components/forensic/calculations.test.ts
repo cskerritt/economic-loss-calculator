@@ -72,8 +72,10 @@ describe("computeAlgebraic", () => {
     const algebraic = computeAlgebraic(params, dateCalc, false);
     expect(algebraic.wlf).toBeCloseTo(0.8);
     expect(algebraic.fringeFactor).toBeCloseTo(1);
-    expect(algebraic.fullMultiplier).toBeCloseTo(0.58672, 5);
-    expect(algebraic.realizedMultiplier).toBeCloseTo(0.76);
+    // Combined tax: 20% + 5% = 25% (simple additive method per forensic economics standard)
+    // WLF 0.8 × Unemp 0.965 × (1 - Tax 0.25) × Fringe 1.0 = 0.579
+    expect(algebraic.fullMultiplier).toBeCloseTo(0.579, 5);
+    expect(algebraic.realizedMultiplier).toBeCloseTo(0.75);
     expect(algebraic.flatFringeAmount).toBe(0);
   });
 
@@ -96,8 +98,11 @@ describe("computeAlgebraic", () => {
 
     const algebraic = computeAlgebraic(params, dateCalc, true);
     expect(algebraic.fringeFactor).toBeCloseTo(1.2);
-    expect(algebraic.fullMultiplier).toBeCloseTo(0.704064, 6);
-    expect(algebraic.realizedMultiplier).toBeCloseTo(0.912);
+    // Combined tax: 20% + 5% = 25% (simple additive method)
+    // WLF 0.8 × Unemp 0.965 × Fringe 1.2 = 0.9264, then subtract tax on base (0.772 × 0.25 = 0.193)
+    // Result: 0.9264 - 0.193 = 0.7334
+    expect(algebraic.fullMultiplier).toBeCloseTo(0.7334, 6);
+    expect(algebraic.realizedMultiplier).toBeCloseTo(0.9);
     expect(algebraic.flatFringeAmount).toBe(20000);
   });
 });
@@ -383,15 +388,23 @@ describe("computeProjection", () => {
 
     const algebraic = computeAlgebraic(earningsParams, dateCalc, false);
     expect(algebraic.wlf).toBeCloseTo(1.5);
-    expect(algebraic.fullMultiplier).toBeCloseTo(1.37548125, 6);
-    expect(algebraic.realizedMultiplier).toBeCloseTo(0.9405, 4);
+    // Combined tax: 10% + 5% = 15% (simple additive method)
+    // WLF 1.5 × Unemp 0.975 × Fringe 1.1 = 1.61438, then subtract tax on base (1.4625 × 0.15 = 0.219375)
+    // Result: 1.61438 - 0.219375 = 1.389375
+    expect(algebraic.fullMultiplier).toBeCloseTo(1.389375, 6);
+    expect(algebraic.realizedMultiplier).toBeCloseTo(0.935, 4);
     const projection = computeProjection(caseInfo, earningsParams, algebraic, { 2021: "15000" }, dateCalc);
 
     expect(projection.pastSchedule).toHaveLength(3);
     const manualRow = projection.pastSchedule.find((row) => row.year === 2021);
     expect(manualRow?.isManual).toBe(true);
     expect(projection.pastSchedule[2].fraction).toBeCloseTo(0.5);
-    expect(projection.totalPastLoss).toBeCloseTo(283017.08221875, 6);
+    // With simple additive tax (15%), AIF = 1.389375, realized = 0.935
+    // Year 0: (100000 - 25000) × 1.389375 = 104203.125
+    // Year 1: 102000 × 1.389375 - 15000 × 0.935 = 127691.25 (manual actual)
+    // Year 2: (52020 - 13005) × 1.389375 = 54206.465625
+    // Total: 286100.84
+    expect(projection.totalPastLoss).toBeCloseTo(286100.84, 2);
 
     expect(projection.futureSchedule).toHaveLength(10);
     const firstFuture = projection.futureSchedule[0];

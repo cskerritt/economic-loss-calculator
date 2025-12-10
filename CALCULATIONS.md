@@ -175,8 +175,10 @@ Examples of fringe benefits:
 ```
 Tax on Base Earnings = Unemployment Adjusted Base × Combined Tax Rate
 
-Combined Tax Rate = 1 - [(1 - Federal Tax Rate) × (1 - State Tax Rate)]
+Combined Tax Rate = Federal Tax Rate + State Tax Rate
 ```
+
+**Note**: Forensic economics uses the simple additive method for combined tax rates, treating federal and state taxes as additive rather than compounding. This is the standard approach as it reflects the typical tax liability structure where state taxes are calculated independently of federal taxes.
 
 **Critical**: Taxes are computed on the unemployment-adjusted base earnings, NOT on fringe benefits.
 
@@ -235,20 +237,18 @@ Where:
    - With Fringes = 0.8521 × 1.215 = 1.0353 (103.53%)
 
 5. **Combined Tax Rate**
-   - Combined = 1 - [(1 - 0.15) × (1 - 0.045)]
-   - Combined = 1 - [0.85 × 0.955]
-   - Combined = 1 - 0.8118 = 0.1882 (18.82%)
+   - Combined = Federal 15% + State 4.5% = 19.5%
 
 6. **Tax on Base Earnings**
-   - Tax = 0.8521 × 0.1882 = 0.1604 (16.04%)
+   - Tax = 0.8521 × 0.195 = 0.1662 (16.62%)
 
 7. **After-Tax Compensation (AIF)**
-   - AIF = 1.0353 - 0.1604 = 0.8749 (87.49%)
+   - AIF = 1.0353 - 0.1662 = 0.8691 (86.91%)
 
-**Result:** For every $1 of gross earnings lost, the compensable loss is $0.8749.
+**Result:** For every $1 of gross earnings lost, the compensable loss is $0.8691.
 
 For $75,000 annual earnings:
-- Annual Net Loss = $75,000 × 0.8749 = $65,618
+- Annual Net Loss = $75,000 × 0.8691 = $65,183
 
 ---
 
