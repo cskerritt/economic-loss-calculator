@@ -279,13 +279,13 @@ export default function ForensicSuite() {
   );
 
   const hhsData: HhsData = useMemo(
-    () => computeHhsData(hhServices, dateCalc.derivedYFS),
-    [hhServices, dateCalc.derivedYFS],
+    () => computeHhsData(hhServices, dateCalc.derivedYFS, earningsParams.enablePresentValue),
+    [hhServices, dateCalc.derivedYFS, earningsParams.enablePresentValue],
   );
 
   const lcpData: LcpData = useMemo(
-    () => computeLcpData(lcpItems, earningsParams.discountRate),
-    [lcpItems, earningsParams.discountRate],
+    () => computeLcpData(lcpItems, earningsParams.discountRate, earningsParams.enablePresentValue),
+    [lcpItems, earningsParams.discountRate, earningsParams.enablePresentValue],
   );
 
   const ageAtInjury = useMemo(

@@ -284,6 +284,37 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
             </div>
           )}
         </div>
+
+        {/* Tinari Methodology Toggles */}
+        <div className="border-t border-border pt-3 mt-3 space-y-3">
+          <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">Tinari Methodology Options</h4>
+          
+          <label className="flex items-center gap-2 cursor-pointer min-h-[40px] touch-manipulation">
+            <input 
+              type="checkbox" 
+              checked={earningsParams.enableFringeBenefits} 
+              onChange={e => setEarningsParams({...earningsParams, enableFringeBenefits: e.target.checked})}
+              className="w-5 h-5 rounded"
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">Include Fringe Benefits</span>
+              <p className="text-xs text-muted-foreground">Add employer-paid benefits to compensation (health, pension, etc.)</p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer min-h-[40px] touch-manipulation">
+            <input 
+              type="checkbox" 
+              checked={earningsParams.enablePresentValue} 
+              onChange={e => setEarningsParams({...earningsParams, enablePresentValue: e.target.checked})}
+              className="w-5 h-5 rounded"
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">Apply Present Value Discounting</span>
+              <p className="text-xs text-muted-foreground">Discount future losses to present value using discount rate</p>
+            </div>
+          </label>
+        </div>
       </Card>
 
       <div className="text-center mb-4 sm:mb-8">

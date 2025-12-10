@@ -189,27 +189,31 @@ export function computeAlgebraic(
 
   // Step 4: Calculate Fringe Benefits Factor (1 + FB)
   // Two modes: Union mode uses flat dollar amounts, standard mode uses percentage
+  // Can be disabled via enableFringeBenefits toggle per Tinari methodology option
   let fringeFactor = 1;
   let flatFringeAmount = 0;
 
-  if (isUnionMode) {
-    // Union Mode: Flat dollar fringe benefits (common in union contracts)
-    // Example: Pension $5,000 + Health $8,000 + Other $2,000 = $15,000 total
-    // If base earnings = $75,000, effective rate = $15,000 / $75,000 = 20%
-    flatFringeAmount =
-      earningsParams.pension +
-      earningsParams.healthWelfare +
-      earningsParams.annuity +
-      earningsParams.clothingAllowance +
-      earningsParams.otherBenefits;
-    const effectiveFringeRate =
-      earningsParams.baseEarnings > 0 ? flatFringeAmount / earningsParams.baseEarnings : 0;
-    fringeFactor = 1 + effectiveFringeRate;
-  } else {
-    // Standard Mode: Percentage-based fringe benefits
-    // Example: 21.5% fringe rate → fringeFactor = 1.215
-    fringeFactor = 1 + earningsParams.fringeRate / 100;
+  if (earningsParams.enableFringeBenefits) {
+    if (isUnionMode) {
+      // Union Mode: Flat dollar fringe benefits (common in union contracts)
+      // Example: Pension $5,000 + Health $8,000 + Other $2,000 = $15,000 total
+      // If base earnings = $75,000, effective rate = $15,000 / $75,000 = 20%
+      flatFringeAmount =
+        earningsParams.pension +
+        earningsParams.healthWelfare +
+        earningsParams.annuity +
+        earningsParams.clothingAllowance +
+        earningsParams.otherBenefits;
+      const effectiveFringeRate =
+        earningsParams.baseEarnings > 0 ? flatFringeAmount / earningsParams.baseEarnings : 0;
+      fringeFactor = 1 + effectiveFringeRate;
+    } else {
+      // Standard Mode: Percentage-based fringe benefits
+      // Example: 21.5% fringe rate → fringeFactor = 1.215
+      fringeFactor = 1 + earningsParams.fringeRate / 100;
+    }
   }
+  // If fringe benefits disabled, fringeFactor remains 1 (no adjustment)
 
   // Step 6: Personal Consumption Factors (for wrongful death cases only)
   // Stores the actual consumption rate (e.g., 0.25 for 25% consumption)
@@ -412,7 +416,10 @@ export function computeProjection(
   for (let i = 0; i < futureYears; i++) {
     const wageGrowthRate = getWageGrowth(eraSplitYear + i, false);
     const growth = Math.pow(1 + wageGrowthRate / 100, i);
-    const discount = 1 / Math.pow(1 + earningsParams.discountRate / 100, i + 0.5);
+    // Apply discount factor only if present value is enabled
+    const discount = earningsParams.enablePresentValue 
+      ? 1 / Math.pow(1 + earningsParams.discountRate / 100, i + 0.5)
+      : 1; // No discounting if PV disabled
     const grossBase = earningsParams.baseEarnings * growth;
     
     // Use Era 2 AIF for future losses
@@ -445,19 +452,20 @@ export function computeProjection(
  * 
  * Formula for each year:
  *   Annual Value = Hours/Week × 52 weeks × Hourly Rate × (1 + Growth Rate)^year
- *   PV = Annual Value × [1 / (1 + Discount Rate)^(year + 0.5)]
+ *   PV = Annual Value × [1 / (1 + Discount Rate)^(year + 0.5)] (if PV enabled)
  * 
  * @param hhServices - Household service parameters (hours, rate, growth, discount)
  * @param derivedYFS - Years to final separation (duration of services needed)
+ * @param enablePresentValue - Whether to apply present value discounting
  * @returns HhsData with nominal total and present value
  * 
  * Example:
  *   15 hrs/week × $25/hr × 52 weeks = $19,500/year
- *   Year 1: $19,500 × 1.03^0 × discount = $19,096 PV
- *   Year 2: $19,500 × 1.03^1 × discount = $18,870 PV
+ *   Year 1: $19,500 × 1.03^0 × discount = $19,096 PV (if PV enabled)
+ *   Year 2: $19,500 × 1.03^1 × discount = $18,870 PV (if PV enabled)
  *   Total over 28.6 years ≈ $423,000 PV
  */
-export function computeHhsData(hhServices: HhServices, derivedYFS: number): HhsData {
+export function computeHhsData(hhServices: HhServices, derivedYFS: number, enablePresentValue: boolean = true): HhsData {
   if (!hhServices.active) return { totalNom: 0, totalPV: 0 };
 
   let totalNom = 0;
@@ -474,9 +482,11 @@ export function computeHhsData(hhServices: HhServices, derivedYFS: number): HhsD
       hhServices.hourlyRate *
       Math.pow(1 + hhServices.growthRate / 100, i);
     
-    // Discount to present value using mid-year convention
+    // Discount to present value using mid-year convention (if enabled)
     // Formula: 1 / (1 + discount rate)^(year + 0.5)
-    const disc = 1 / Math.pow(1 + hhServices.discountRate / 100, i + 0.5);
+    const disc = enablePresentValue 
+      ? 1 / Math.pow(1 + hhServices.discountRate / 100, i + 0.5)
+      : 1; // No discounting if PV disabled
     
     totalNom += annualValue;
     totalPV += annualValue * disc;
@@ -522,7 +532,7 @@ export function computeHhsData(hhServices: HhServices, derivedYFS: number): HhsD
  *   Year 2: $2,440 × 1.0165^1 × 1/1.04225^1.5 = $2,292 PV
  *   Total over 30 years ≈ $51,800 PV
  */
-export function computeLcpData(lcpItems: LcpItem[], discountRate: number): LcpData {
+export function computeLcpData(lcpItems: LcpItem[], discountRate: number, enablePresentValue: boolean = true): LcpData {
   let totalNom = 0;
   let totalPV = 0;
 
@@ -540,7 +550,10 @@ export function computeLcpData(lcpItems: LcpItem[], discountRate: number): LcpDa
       for (const year of years) {
         const t = year - 1;
         const inflated = item.baseCost * Math.pow(1 + item.cpi / 100, t);
-        const discount = 1 / Math.pow(1 + discountRate / 100, t + 0.5);
+        // Apply discount factor only if present value is enabled
+        const discount = enablePresentValue 
+          ? 1 / Math.pow(1 + discountRate / 100, t + 0.5)
+          : 1; // No discounting if PV disabled
         itemNominal += inflated;
         itemPV += inflated * discount;
       }
@@ -555,7 +568,10 @@ export function computeLcpData(lcpItems: LcpItem[], discountRate: number): LcpDa
         if (active) {
           const absoluteYearIndex = baseStartYear - 1 + t;
           const inflated = item.baseCost * Math.pow(1 + item.cpi / 100, absoluteYearIndex);
-          const discount = 1 / Math.pow(1 + discountRate / 100, absoluteYearIndex + 0.5);
+          // Apply discount factor only if present value is enabled
+          const discount = enablePresentValue 
+            ? 1 / Math.pow(1 + discountRate / 100, absoluteYearIndex + 0.5)
+            : 1; // No discounting if PV disabled
           itemNominal += inflated;
           itemPV += inflated * discount;
         }
