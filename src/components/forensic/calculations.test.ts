@@ -366,6 +366,67 @@ describe("computeAlgebraic - Tinari Method", () => {
     expect(algebraic.era1AIF).toBeCloseTo(afterTax * 0.70, 4);
     expect(algebraic.era2AIF).toBeCloseTo(afterTax * 0.75, 4);
   });
+
+  it("respects enableFringeBenefits toggle when OFF", () => {
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 100000,
+      wle: 25,
+      fringeRate: 30, // 30% fringe benefits (but should be ignored)
+      unemploymentRate: 0,
+      uiReplacementRate: 0,
+      fedTaxRate: 20,
+      stateTaxRate: 5,
+      isWrongfulDeath: false,
+      enableFringeBenefits: false, // TOGGLE OFF
+    };
+
+    const algebraic = computeAlgebraic(params, { ...dateCalc, derivedYFS: 25 }, false);
+    
+    // WLF = 25/25 = 1.0
+    expect(algebraic.wlf).toBeCloseTo(1.0, 4);
+    
+    // Fringe factor should be 1.0 (no fringes applied)
+    expect(algebraic.fringeFactor).toBeCloseTo(1.0, 4);
+    
+    // Gross compensation should equal unemployment-adjusted base (no fringe addition)
+    expect(algebraic.grossCompensationWithFringes).toBeCloseTo(1.0, 4);
+    
+    // Tax on base = 100% × 25% = 25%
+    expect(algebraic.taxOnBaseEarnings).toBeCloseTo(0.25, 4);
+    
+    // After-tax = 100% - 25% = 75%
+    expect(algebraic.afterTaxCompensation).toBeCloseTo(0.75, 4);
+  });
+
+  it("respects enableFringeBenefits toggle when ON", () => {
+    const params: EarningsParams = {
+      ...DEFAULT_EARNINGS_PARAMS,
+      baseEarnings: 100000,
+      wle: 25,
+      fringeRate: 30, // 30% fringe benefits
+      unemploymentRate: 0,
+      uiReplacementRate: 0,
+      fedTaxRate: 20,
+      stateTaxRate: 5,
+      isWrongfulDeath: false,
+      enableFringeBenefits: true, // TOGGLE ON
+    };
+
+    const algebraic = computeAlgebraic(params, { ...dateCalc, derivedYFS: 25 }, false);
+    
+    // Fringe factor should be 1.30 (30% fringes applied)
+    expect(algebraic.fringeFactor).toBeCloseTo(1.30, 4);
+    
+    // Gross compensation = 100% × 1.30 = 130%
+    expect(algebraic.grossCompensationWithFringes).toBeCloseTo(1.30, 4);
+    
+    // Tax on base only = 100% × 25% = 25%
+    expect(algebraic.taxOnBaseEarnings).toBeCloseTo(0.25, 4);
+    
+    // After-tax = 130% - 25% = 105%
+    expect(algebraic.afterTaxCompensation).toBeCloseTo(1.05, 4);
+  });
 });
 
 describe("computeProjection", () => {
@@ -426,6 +487,37 @@ describe("computeHhsData", () => {
     );
 
     expect(result.totalNom).toBeCloseTo(21112);
+    const expectedPV =
+      (10 * 52 * 20) / Math.pow(1.05, 0.5) +
+      (10 * 52 * 20 * 1.03) / Math.pow(1.05, 1.5);
+    expect(result.totalPV).toBeCloseTo(expectedPV, 6);
+  });
+
+  it("respects enablePresentValue=false (no discounting)", () => {
+    const result = computeHhsData(
+      { ...DEFAULT_HH_SERVICES, active: true, hoursPerWeek: 10, hourlyRate: 20, growthRate: 3, discountRate: 5 },
+      2,
+      false, // Present value disabled
+    );
+
+    // Nominal values should be the same
+    expect(result.totalNom).toBeCloseTo(21112);
+    
+    // PV should equal nominal (no discounting applied)
+    expect(result.totalPV).toBeCloseTo(result.totalNom, 6);
+  });
+
+  it("respects enablePresentValue=true (with discounting)", () => {
+    const result = computeHhsData(
+      { ...DEFAULT_HH_SERVICES, active: true, hoursPerWeek: 10, hourlyRate: 20, growthRate: 3, discountRate: 5 },
+      2,
+      true, // Present value enabled
+    );
+
+    // PV should be less than nominal due to discounting
+    expect(result.totalPV).toBeLessThan(result.totalNom);
+    
+    // Verify the discount is applied correctly
     const expectedPV =
       (10 * 52 * 20) / Math.pow(1.05, 0.5) +
       (10 * 52 * 20 * 1.03) / Math.pow(1.05, 1.5);
@@ -525,6 +617,61 @@ describe("computeLcpData", () => {
     expect(item.totalPV).toBeCloseTo(3000, 6);
     expect(item.totalPV).toBeLessThan(result.totalNom + 1e-6);
     expect(result.totalPV).toBeCloseTo(3000, 6);
+  });
+
+  it("respects enablePresentValue=false (no discounting for LCP)", () => {
+    const items = [
+      {
+        id: 1,
+        categoryId: "evals",
+        name: "Annual therapy",
+        baseCost: 1000,
+        freqType: "annual",
+        duration: 2,
+        startYear: 1,
+        endYear: 2,
+        cpi: 2,
+        recurrenceInterval: 1,
+        useCustomYears: false,
+        customYears: [],
+      },
+    ];
+
+    const result = computeLcpData(items, 5, false); // PV disabled
+    
+    // PV should equal nominal (no discounting)
+    expect(result.totalPV).toBeCloseTo(result.totalNom, 6);
+    expect(result.items[0].totalPV).toBeCloseTo(result.items[0].totalNom, 6);
+  });
+
+  it("respects enablePresentValue=true (with discounting for LCP)", () => {
+    const items = [
+      {
+        id: 1,
+        categoryId: "evals",
+        name: "Annual therapy",
+        baseCost: 1000,
+        freqType: "annual",
+        duration: 2,
+        startYear: 1,
+        endYear: 2,
+        cpi: 2,
+        recurrenceInterval: 1,
+        useCustomYears: false,
+        customYears: [],
+      },
+    ];
+
+    const result = computeLcpData(items, 5, true); // PV enabled
+    
+    // PV should be less than nominal due to discounting
+    expect(result.totalPV).toBeLessThan(result.totalNom);
+    
+    // Verify the discount calculation
+    const expectedPV =
+      (1000 * Math.pow(1.02, 0)) / Math.pow(1.05, 0.5) +
+      (1000 * Math.pow(1.02, 1)) / Math.pow(1.05, 1.5);
+    expect(result.totalPV).toBeCloseTo(expectedPV, 6);
   });
 });
 
