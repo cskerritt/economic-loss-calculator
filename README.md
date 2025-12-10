@@ -1,4 +1,55 @@
-# Welcome to your Lovable project
+# Welcome to ForensicSuite - Economic Loss Calculator
+
+## Project Overview
+
+ForensicSuite is a professional **Forensic Economic Loss Calculator** designed for calculating economic damages in personal injury and wrongful death litigation cases. It implements the **Tinari Algebraic Method**, a widely accepted methodology in forensic economics.
+
+### Key Features
+
+- **Lost Earning Capacity Calculations** - Past and future earnings projections
+- **Household Services Valuation** - Replacement cost of household services
+- **Life Care Plan Integration** - Present value of medical and care expenses
+- **Multiple Retirement Scenarios** - Sensitivity analysis for different assumptions
+- **Tinari Algebraic Method** - Industry-standard calculation methodology
+- **Professional Report Generation** - PDF, Word, and Excel exports
+- **Cloud Auto-Save** - Automatic case saving with Supabase integration
+
+## 📖 Documentation
+
+### Complete Documentation Suite
+
+This project includes comprehensive documentation to help users understand and utilize the software:
+
+#### 1. **[USER_GUIDE.md](./USER_GUIDE.md)** - Complete User Guide
+Step-by-step instructions for using the software:
+- Getting started and navigation
+- Detailed explanation of each step in the wizard
+- Case management and saving
+- Report generation
+- Advanced features
+- Tips and best practices
+- Troubleshooting
+
+#### 2. **[CALCULATIONS.md](./CALCULATIONS.md)** - Calculation Methodology
+Technical documentation of all calculations and formulas:
+- Date and age calculations
+- Work Life Factor (WLF)
+- Tinari Algebraic Method (Adjusted Income Factor)
+- Earnings loss projections (past and future)
+- Household services calculations
+- Life care plan present values
+- Scenario analysis and comparisons
+- Present value discounting methods
+- Era-based calculations (Tinari two-era method)
+- Wrongful death adjustments
+- Validation and reasonableness checks
+
+Both documents include:
+- ✅ Detailed explanations with examples
+- ✅ Step-by-step calculations
+- ✅ Real-world numerical examples
+- ✅ Professional standards and references
+- ✅ Formulas and methodologies
 
 ## Project info
 
