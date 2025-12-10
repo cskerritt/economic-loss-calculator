@@ -151,11 +151,11 @@ export function computeWorkLifeFactor(earningsParams: EarningsParams, derivedYFS
  *   Step 2: Worklife = 1.0000 × 0.8741 = 0.8741
  *   Step 3: Unemployment = 0.8741 × 0.9748 = 0.8521
  *   Step 4: With Fringes = 0.8521 × 1.215 = 1.0353
- *   Step 5: Combined Tax = 1 - [(1-0.15) × (1-0.045)] = 0.1882
- *            Tax on Base = 0.8521 × 0.1882 = 0.1604
- *            After Tax = 1.0353 - 0.1604 = 0.8749
+ *   Step 5: Combined Tax = 0.15 + 0.045 = 0.195 (simple additive method)
+ *            Tax on Base = 0.8521 × 0.195 = 0.1662
+ *            After Tax = 1.0353 - 0.1662 = 0.8691
  *   
- *   Result: For every $1 of gross earnings lost, compensable loss is $0.8749
+ *   Result: For every $1 of gross earnings lost, compensable loss is $0.8691
  * 
  * @param earningsParams - All earnings-related parameters
  * @param dateCalc - Date calculations including YFS
@@ -765,7 +765,7 @@ export function computeDetailedScenarioSchedule(
 
   const unempFactor =
     1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
-  const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
+  const combinedTaxRate = (earningsParams.fedTaxRate + earningsParams.stateTaxRate) / 100;
 
   let fringeFactor = 1;
   if (isUnionMode) {
@@ -780,7 +780,18 @@ export function computeDetailedScenarioSchedule(
     fringeFactor = 1 + earningsParams.fringeRate / 100;
   }
 
-  const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
+  // Apply Tinari method: taxes only on base, not on fringes
+  const unemploymentAdjustedBase = wlf * unempFactor;
+  const grossCompensationWithFringes = unemploymentAdjustedBase * fringeFactor;
+  const taxOnBaseEarnings = unemploymentAdjustedBase * combinedTaxRate;
+  const afterTaxCompensation = grossCompensationWithFringes - taxOnBaseEarnings;
+  
+  // Apply personal consumption for wrongful death cases
+  const personalConsumptionFactor = earningsParams.isWrongfulDeath 
+    ? (earningsParams.era2PersonalConsumption / 100)  // Use era2 for future projections
+    : 0;
+  const fullMultiplier = afterTaxCompensation * (1 - personalConsumptionFactor);
+  
   const schedule: DetailedScheduleRow[] = [];
   let cumPV = 0;
 
