@@ -543,9 +543,11 @@ Access via user menu (top right):
 - CSV for data analysis
 - Excel for detailed review
 
-### AI Assistant (If Available)
+### AI Assistant
 
-The AI assistant can help with:
+**Note**: AI Assistant feature availability may vary by deployment.
+
+If available, the AI assistant can help with:
 - Explaining calculations
 - Suggesting typical values
 - Reviewing case for completeness

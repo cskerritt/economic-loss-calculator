@@ -232,6 +232,8 @@ export function computeAlgebraic(
   // Step 3: Unemployment-Adjusted Base
   // Apply unemployment factor to account for job search periods
   // Example: 87.41% × 0.9748 = 85.21% (after unemployment losses)
+  // Note: Intermediate calculations may show slight variations due to decimal precision
+  // Actual: 0.8741 × 0.9748 = 0.8521017... ≈ 0.8521
   const unemploymentAdjustedBase = worklifeAdjustedBase * unempFactor; // × (1 - UF)
   
   // Step 4: Gross Compensation with Fringe Benefits

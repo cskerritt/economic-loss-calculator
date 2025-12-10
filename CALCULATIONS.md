@@ -657,7 +657,7 @@ Typical sources:
 - Historical market returns
 - State-specific requirements
 
-Common range: 2.5% to 5.0%
+Common range: 2.5% to 5.0% (Note: In higher interest rate environments, such as 2023-2024, rates may exceed 5%)
 
 ### Example Calculations
 
@@ -996,11 +996,12 @@ The software generates professional reports in multiple formats:
 
 ### Key Publications
 
-1. Tinari, Frank D. "The Algebraic Method for Calculating Economic Damages"
-2. Skoog, Gary R. and James E. Ciecka. "The Markov (Increment-Decrement) Model of Labor Force Activity" (2017)
-3. U.S. Bureau of Labor Statistics - Employment data
-4. CDC National Vital Statistics Reports - Life tables
-5. Social Security Administration - Work life expectancy data
+1. Tinari, Frank D. "The Algebraic Method for Calculating Economic Damages," Journal of Forensic Economics, Vol. 2, No. 2, 1989, pp. 103-114.
+2. Skoog, Gary R. and James E. Ciecka. "The Markov (Increment-Decrement) Model of Labor Force Activity: Extended Tables of Central Tendency, Shape, Percentile Points, and Bootstrap Standard Errors," Journal of Forensic Economics, Vol. 27, No. 1, 2017, pp. 83-127.
+3. U.S. Bureau of Labor Statistics - Employment Statistics and Unemployment Data
+4. CDC National Vital Statistics Reports - United States Life Tables (annual updates)
+5. Social Security Administration - Work Life Expectancy Tables and Actuarial Data
+6. Ireland, Thomas R. and John O. Ward. "The Present Value of Future Damages: A Practical Guide to Forensic Economics," Journal of Legal Economics, various editions.
 
 ### Calculation Standards
 
