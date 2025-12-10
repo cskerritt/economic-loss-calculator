@@ -267,7 +267,12 @@ export function computeAlgebraic(
   // For personal injury: fullMultiplier = afterTaxCompensation
   // For wrongful death: fullMultiplier = era1AIF (with personal consumption applied)
   const fullMultiplier = earningsParams.isWrongfulDeath ? era1AIF : afterTaxCompensation;
-  const realizedMultiplier = afterTaxFactor * fringeFactor; // Simplified version for residual earnings
+  
+  // Realized multiplier for actual/residual earnings
+  // Used for manual actual earnings in past schedule calculations
+  // This is a simplified calculation that applies after-tax factor and fringes
+  // but doesn't include worklife or unemployment adjustments (those are inherent in actual earnings)
+  const realizedMultiplier = afterTaxFactor * fringeFactor;
 
   return {
     wlf,

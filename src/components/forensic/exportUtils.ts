@@ -180,16 +180,32 @@ export async function exportSectionToWord(
         aefRows.push(new TableRow({
           children: [
             createBorderedCell('6a'),
-            createBorderedCell('× (1 - Personal Consumption) Era 1'),
+            createBorderedCell('Personal Consumption Rate (Era 1)'),
             createBorderedCell(`${(algebraic.era1PersonalConsumptionFactor * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell('', { alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+        aefRows.push(new TableRow({
+          children: [
+            createBorderedCell('6a2'),
+            createBorderedCell('After-Tax AIF × (1 - Personal Consumption)'),
+            createBorderedCell('', { alignment: AlignmentType.RIGHT }),
             createBorderedCell(`${(algebraic.era1AIF * 100).toFixed(2)}%`, { bold: true, alignment: AlignmentType.RIGHT }),
           ]
         }));
         aefRows.push(new TableRow({
           children: [
             createBorderedCell('6b'),
-            createBorderedCell('× (1 - Personal Consumption) Era 2'),
+            createBorderedCell('Personal Consumption Rate (Era 2)'),
             createBorderedCell(`${(algebraic.era2PersonalConsumptionFactor * 100).toFixed(2)}%`, { alignment: AlignmentType.RIGHT }),
+            createBorderedCell('', { alignment: AlignmentType.RIGHT }),
+          ]
+        }));
+        aefRows.push(new TableRow({
+          children: [
+            createBorderedCell('6b2'),
+            createBorderedCell('After-Tax AIF × (1 - Personal Consumption)'),
+            createBorderedCell('', { alignment: AlignmentType.RIGHT }),
             createBorderedCell(`${(algebraic.era2AIF * 100).toFixed(2)}%`, { bold: true, alignment: AlignmentType.RIGHT }),
           ]
         }));
