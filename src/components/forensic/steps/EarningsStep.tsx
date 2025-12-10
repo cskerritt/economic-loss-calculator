@@ -118,14 +118,16 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
   }, [dob, dateOfInjury]);
 
   // Calculate all retirement scenarios
+  // Per Tinari (2016): YFS = chronological years from injury to expected retirement
+  // WLF = WLE / YFS (probability-weighted years / chronological years)
   const scenarios: RetirementScenarioCalc[] = useMemo(() => {
     const results: RetirementScenarioCalc[] = [];
     
-    // WLE-based scenario: WLE retirement age is when WLE years have passed from injury
+    // WLE-based scenario: retirement age is injury age + WLE
+    // Note: WLE is already probability-weighted, so WLF = 100% for this scenario
     const wleRetAge = ageAtInjury + earningsParams.wle;
-    // Users enter YFS/WLE as years from injury; convert to years from trial by subtracting past years
-    const yearsFromInjury = earningsParams.useManualYFS ? earningsParams.yfsManual : earningsParams.wle;
-    const wleYFS = Math.max(0, yearsFromInjury - dateCalc.pastYears);
+    const wleYFS = earningsParams.useManualYFS ? earningsParams.yfsManual : earningsParams.wle;
+    // For WLE-based scenario, WLF = WLE/YFS = 100% when YFS equals WLE
     const wleWLF = wleYFS > 0 ? (earningsParams.wle / wleYFS) * 100 : 0;
     
     results.push({
@@ -137,7 +139,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
       enabled: true
     });
 
-    // Standard age scenarios
+    // Standard age scenarios: YFS = retirement age - age at injury
     for (const scenario of RETIREMENT_SCENARIOS.filter(s => s.retirementAge !== null)) {
       const retAge = scenario.retirementAge!;
       const yfs = Math.max(0, retAge - ageAtInjury);
@@ -169,7 +171,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
     }
 
     return results;
-  }, [ageAtInjury, earningsParams.wle, earningsParams.useManualYFS, earningsParams.yfsManual, earningsParams.enablePJI, earningsParams.pjiAge, dateCalc.pastYears]);
+  }, [ageAtInjury, earningsParams.wle, earningsParams.useManualYFS, earningsParams.yfsManual, earningsParams.enablePJI, earningsParams.pjiAge]);
 
   const selectedScenarioData = scenarios.find(s => s.id === earningsParams.selectedScenario) || scenarios[0];
 
@@ -378,6 +380,10 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
 
             <div className="border-t border-border pt-3 mt-2 sm:mt-3">
               <h4 className="text-[10px] sm:text-[11px] font-bold uppercase text-muted-foreground mb-2">Years to Final Separation (YFS)</h4>
+              <p className="text-xs text-muted-foreground mb-2">
+                YFS = chronological years from injury to expected retirement (Tinari, 2016). 
+                Unlike WLE, YFS includes all years regardless of unemployment probability.
+              </p>
               <label className="flex items-center gap-3 text-xs sm:text-sm mb-2 cursor-pointer min-h-[40px] touch-manipulation">
                 <input 
                   type="checkbox" 
@@ -390,21 +396,19 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
               {earningsParams.useManualYFS ? (
                 <>
                   <InputGroup 
-                    label="Manual YFS (from injury date)" 
+                    label="Manual YFS (injury → retirement)" 
                     suffix="years" 
                     value={earningsParams.yfsManual} 
                     onChange={v => setEarningsParams({...earningsParams, yfsManual: parseFloat(v) || 0})} 
                     step="0.01"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Enter years from injury date (like WLE). System will automatically adjust to trial date.
-                    {dateCalc.pastYears > 0 && (
-                      <span> ({dateCalc.pastYears.toFixed(2)} years will be subtracted)</span>
-                    )}
+                    Enter total years from date of injury to expected retirement. 
+                    WLF = WLE ÷ YFS × 100%
                   </p>
                 </>
               ) : (
-                <p className="text-xs text-muted-foreground">YFS is auto-calculated from the active retirement scenario. Only override if you must force a specific timeline.</p>
+                <p className="text-xs text-muted-foreground">YFS is auto-calculated as (Retirement Age − Age at Injury). Only override for custom vocationally-informed analysis.</p>
               )}
             </div>
           </div>

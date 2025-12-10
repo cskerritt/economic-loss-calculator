@@ -47,15 +47,26 @@ export function parseDate(dateStr: string): Date {
  * - Age at trial: How old at the trial/valuation date
  * - Current age: How old today
  * - Past years: Time elapsed from injury to trial (for past loss calculations)
- * - Derived YFS: Years from trial to retirement (for future loss calculations)
+ * - Derived YFS: Years to Final Separation from injury to retirement
+ * 
+ * Years to Final Separation (YFS) Definition:
+ * YFS is the chronological time from the date of injury until the expected retirement age.
+ * Unlike WLE (which is probability-weighted), YFS represents the full remaining career
+ * horizon assuming continuous labor force participation.
+ * 
+ * Per Tinari (2016): "YFS yields a higher number than WLE because it includes all years
+ * until the expected retirement date, regardless of short-term unemployment."
  * 
  * @param caseInfo - Case information containing dates
  * @param today - Current date (defaults to now, can be overridden for testing)
  * @returns DateCalc object with all computed age and time values
  * 
  * Example:
- *   DOB: 1/15/1985, DOI: 3/10/2020, DOT: 6/15/2023, Retirement: 67
- *   → ageInjury: 35.2, ageTrial: 38.4, pastYears: 3.3, derivedYFS: 28.6
+ *   DOB: 1/15/1985, DOI: 3/10/2020, DOT: 6/15/2023, Retirement Age: 67
+ *   Age at injury: 35.2
+ *   YFS = 67 - 35.2 = 31.8 years (from injury to retirement)
+ *   Past years = 3.3 (injury to trial)
+ *   Future years = YFS - Past years = 28.5 years
  */
 export function computeDateCalc(caseInfo: CaseInfo, today: Date = new Date()): DateCalc {
   if (!caseInfo.dob || !caseInfo.dateOfInjury || !caseInfo.dateOfTrial) {
@@ -69,18 +80,19 @@ export function computeDateCalc(caseInfo: CaseInfo, today: Date = new Date()): D
   // Calculate age at any date by converting milliseconds to years
   const getAge = (d: Date) => (d.getTime() - dob.getTime()) / MS_PER_YEAR;
   
+  // Age at injury (used for YFS calculation)
+  const ageAtInjury = getAge(doi);
+  
   // Past years = time from injury to trial (can include partial years)
   const pastYears = Math.max(0, (dot.getTime() - doi.getTime()) / MS_PER_YEAR);
 
-  // Calculate expected retirement date based on retirement age
-  const targetRetirementDate = new Date(dob);
-  targetRetirementDate.setFullYear(dob.getFullYear() + caseInfo.retirementAge);
-  
-  // Years to Final Separation (YFS) = time from trial to retirement
-  const derivedYFS = Math.max(0, (targetRetirementDate.getTime() - dot.getTime()) / MS_PER_YEAR);
+  // Years to Final Separation (YFS) = retirement age minus age at injury
+  // This represents the full career horizon from injury to expected retirement
+  // Per Tinari method: YFS is chronological years, not probability-weighted
+  const derivedYFS = Math.max(0, caseInfo.retirementAge - ageAtInjury);
 
   return {
-    ageInjury: getAge(doi).toFixed(1),
+    ageInjury: ageAtInjury.toFixed(1),
     ageTrial: getAge(dot).toFixed(1),
     currentAge: getAge(today).toFixed(1),
     pastYears,
@@ -91,23 +103,39 @@ export function computeDateCalc(caseInfo: CaseInfo, today: Date = new Date()): D
 /**
  * Compute the Work Life Factor (WLF)
  * 
- * The WLF represents the percentage of remaining years to retirement that the plaintiff
- * would have actually worked, accounting for periods of unemployment, disability, early
- * retirement, etc. Based on actuarial work-life expectancy tables (e.g., Skoog-Ciecka).
+ * Work Life Expectancy (WLE) vs Years to Final Separation (YFS):
  * 
- * Formula: WLF = (WLE / YFS) × 100%
+ * WLE (Work Life Expectancy):
+ * - Probability-weighted expected years of labor force participation
+ * - Derived from Markov worklife tables (Skoog, Ciecka, & Krueger, 2010)
+ * - Accounts for mortality, disability, unemployment, and retirement probabilities
+ * - Represents EXPECTED working years, not chronological time
+ * 
+ * YFS (Years to Final Separation):
+ * - Chronological years from injury to expected retirement age
+ * - Represents the full remaining career horizon
+ * - YFS > WLE because it doesn't weight for labor force exits
+ * 
+ * Formula: WLF = WLE / YFS
+ * 
+ * The WLF adjusts gross earnings to reflect the statistical probability of
+ * actual labor force participation over the remaining career.
  * 
  * @param earningsParams - Parameters including work life expectancy (WLE)
- * @param derivedYFS - Years from trial to retirement (Years to Final Separation)
+ * @param derivedYFS - Years to Final Separation (from injury to retirement)
  * @returns Work Life Factor as a percentage (e.g., 87.4 means 87.4%)
  * 
  * Example:
- *   WLE = 25 years (from actuarial tables)
- *   YFS = 28.6 years (from age 38.4 to 67)
- *   WLF = (25 / 28.6) × 100 = 87.41%
+ *   WLE = 25 years (from Skoog-Ciecka actuarial tables)
+ *   YFS = 31.8 years (from age 35.2 at injury to retirement at 67)
+ *   WLF = (25 / 31.8) × 100 = 78.62%
  *   
- *   Interpretation: Plaintiff would have worked 87.41% of remaining years,
- *   with 12.59% lost to unemployment, disability, or early retirement.
+ *   Interpretation: Plaintiff would have worked 78.62% of the chronological
+ *   years remaining, with 21.38% lost to unemployment, disability, or early exit.
+ * 
+ * References:
+ *   Skoog, G.R., Ciecka, J.E., & Krueger, K.V. (2010). The Markov model of labor force activity.
+ *   Tinari, F.D. (2016). Worklife expectancy and retirement assumptions in forensic economic analysis.
  */
 export function computeWorkLifeFactor(earningsParams: EarningsParams, derivedYFS: number): number {
   if (derivedYFS <= 0) return 0;
