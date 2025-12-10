@@ -123,7 +123,9 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
     
     // WLE-based scenario: WLE retirement age is when WLE years have passed from injury
     const wleRetAge = ageAtInjury + earningsParams.wle;
-    const wleYFS = earningsParams.useManualYFS ? earningsParams.yfsManual : earningsParams.wle;
+    // Users enter YFS/WLE as years from injury; convert to years from trial by subtracting past years
+    const yearsFromInjury = earningsParams.useManualYFS ? earningsParams.yfsManual : earningsParams.wle;
+    const wleYFS = Math.max(0, yearsFromInjury - dateCalc.pastYears);
     const wleWLF = wleYFS > 0 ? (earningsParams.wle / wleYFS) * 100 : 0;
     
     results.push({
@@ -167,7 +169,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
     }
 
     return results;
-  }, [ageAtInjury, earningsParams.wle, earningsParams.useManualYFS, earningsParams.yfsManual, earningsParams.enablePJI, earningsParams.pjiAge]);
+  }, [ageAtInjury, earningsParams.wle, earningsParams.useManualYFS, earningsParams.yfsManual, earningsParams.enablePJI, earningsParams.pjiAge, dateCalc.pastYears]);
 
   const selectedScenarioData = scenarios.find(s => s.id === earningsParams.selectedScenario) || scenarios[0];
 
@@ -386,13 +388,21 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
                 <span>Use Manual YFS Override</span>
               </label>
               {earningsParams.useManualYFS ? (
-                <InputGroup 
-                  label="Manual YFS" 
-                  suffix="years" 
-                  value={earningsParams.yfsManual} 
-                  onChange={v => setEarningsParams({...earningsParams, yfsManual: parseFloat(v) || 0})} 
-                  step="0.01"
-                />
+                <>
+                  <InputGroup 
+                    label="Manual YFS (from injury date)" 
+                    suffix="years" 
+                    value={earningsParams.yfsManual} 
+                    onChange={v => setEarningsParams({...earningsParams, yfsManual: parseFloat(v) || 0})} 
+                    step="0.01"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Enter years from injury date (like WLE). System will automatically adjust to trial date.
+                    {dateCalc.pastYears > 0 && (
+                      <span> ({dateCalc.pastYears.toFixed(2)} years will be subtracted)</span>
+                    )}
+                  </p>
+                </>
               ) : (
                 <p className="text-xs text-muted-foreground">YFS is auto-calculated from the active retirement scenario. Only override if you must force a specific timeline.</p>
               )}
