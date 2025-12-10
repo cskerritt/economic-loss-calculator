@@ -123,8 +123,7 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
     
     // WLE-based scenario: WLE retirement age is when WLE years have passed from injury
     const wleRetAge = ageAtInjury + earningsParams.wle;
-    // YFS should be from trial date, so subtract past years to convert from injury-based to trial-based
-    // User enters both WLE and manual YFS as years from injury date (like WLE)
+    // Users enter YFS/WLE as years from injury; convert to years from trial by subtracting past years
     const yearsFromInjury = earningsParams.useManualYFS ? earningsParams.yfsManual : earningsParams.wle;
     const wleYFS = Math.max(0, yearsFromInjury - dateCalc.pastYears);
     const wleWLF = wleYFS > 0 ? (earningsParams.wle / wleYFS) * 100 : 0;
@@ -399,7 +398,9 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
                   />
                   <p className="text-xs text-muted-foreground mt-2">
                     Enter years from injury date (like WLE). System will automatically adjust to trial date.
-                    {dateCalc.pastYears > 0 && ` (${dateCalc.pastYears.toFixed(2)} years will be subtracted)`}
+                    {dateCalc.pastYears > 0 && (
+                      <span> ({dateCalc.pastYears.toFixed(2)} years will be subtracted)</span>
+                    )}
                   </p>
                 </>
               ) : (
