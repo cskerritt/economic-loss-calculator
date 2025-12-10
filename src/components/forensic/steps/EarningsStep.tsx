@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Briefcase, TrendingUp, HeartPulse, History, Calendar, Target, AlertCircle, Skull, Layers } from 'lucide-react';
+import { Briefcase, TrendingUp, HeartPulse, History, Calendar, Target, AlertCircle, Skull, Layers, Info } from 'lucide-react';
 import { Card, SectionHeader, InputGroup } from '../ui';
 import { EarningsParams, DateCalc, Algebraic, RETIREMENT_SCENARIOS } from '../types';
 import { parseDate } from '../calculations';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface RetirementScenarioCalc {
   id: string;
@@ -351,7 +352,25 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
             <p className="text-xs text-muted-foreground -mt-1">Use yearly amounts. Residual is what the person can realistically earn after the injury.</p>
             
             <div className="border-t border-border pt-3 mt-2 sm:mt-3">
-              <h4 className="text-[10px] sm:text-[11px] font-bold uppercase text-muted-foreground mb-2">Work Life Expectancy</h4>
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="text-[10px] sm:text-[11px] font-bold uppercase text-muted-foreground">Work Life Expectancy (WLE)</h4>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs p-3">
+                      <p className="font-semibold mb-1">Work Life Expectancy (WLE)</p>
+                      <p className="text-xs mb-2">Probability-weighted expected years of labor force participation from the date of injury.</p>
+                      <ul className="text-xs space-y-1 list-disc ml-3">
+                        <li>Derived from Markov worklife tables (Skoog, Ciecka & Krueger, 2010)</li>
+                        <li>Accounts for mortality, disability, unemployment, and retirement</li>
+                        <li>WLE &lt; YFS because it weights for labor force exits</li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <InputGroup 
                 label="WLE (from injury date)" 
                 suffix="years" 
@@ -379,11 +398,44 @@ export const EarningsStep: React.FC<EarningsStepProps> = ({
             </div>
 
             <div className="border-t border-border pt-3 mt-2 sm:mt-3">
-              <h4 className="text-[10px] sm:text-[11px] font-bold uppercase text-muted-foreground mb-2">Years to Final Separation (YFS)</h4>
-              <p className="text-xs text-muted-foreground mb-2">
-                YFS = chronological years from injury to expected retirement (Tinari, 2016). 
-                Unlike WLE, YFS includes all years regardless of unemployment probability.
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="text-[10px] sm:text-[11px] font-bold uppercase text-muted-foreground">Years to Final Separation (YFS)</h4>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs p-3">
+                      <p className="font-semibold mb-1">Years to Final Separation (YFS)</p>
+                      <p className="text-xs mb-2">Chronological years from injury to expected retirement (Tinari, 2016).</p>
+                      <ul className="text-xs space-y-1 list-disc ml-3">
+                        <li>Formula: YFS = Retirement Age − Age at Injury</li>
+                        <li>Represents full career horizon without probability weighting</li>
+                        <li>YFS &gt; WLE because it doesn't discount for unemployment/exits</li>
+                      </ul>
+                      <p className="text-xs mt-2 font-medium">WLF = WLE ÷ YFS</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              
+              {/* WLE > YFS Warning */}
+              {selectedScenarioData && earningsParams.wle > selectedScenarioData.yfs && selectedScenarioData.yfs > 0 && (
+                <div className="flex items-start gap-2 p-3 mb-3 rounded-lg bg-amber-500/15 border border-amber-500/30">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-semibold text-amber-700">WLE exceeds YFS</p>
+                    <p className="text-amber-600/90 mt-1">
+                      Work Life Expectancy ({earningsParams.wle.toFixed(2)} yrs) should not exceed Years to Final Separation ({selectedScenarioData.yfs.toFixed(2)} yrs). 
+                      WLE is probability-weighted and represents expected working years, which cannot exceed the total chronological years available (YFS).
+                    </p>
+                    <p className="text-amber-600/80 mt-1 italic">
+                      Review your WLE table lookup or consider a later retirement age.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               <label className="flex items-center gap-3 text-xs sm:text-sm mb-2 cursor-pointer min-h-[40px] touch-manipulation">
                 <input 
                   type="checkbox" 
