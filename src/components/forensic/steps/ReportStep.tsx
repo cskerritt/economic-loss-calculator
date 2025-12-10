@@ -605,41 +605,43 @@ export const ReportStep: React.FC<ReportStepProps> = ({
           <p className="text-sm mb-4">The following table shows the projected earnings loss for each year from the date of injury through assumed retirement.</p>
           
           {/* Combined Past & Future Table */}
-          <table className="w-full text-[9pt] border-collapse">
-            <thead>
-              <tr className="bg-slate-100">
-                <th className="p-1 text-left border border-slate-300">Year</th>
-                <th className="p-1 text-center border border-slate-300">Calendar</th>
-                <th className="p-1 text-center border border-slate-300">Period</th>
-                <th className="p-1 text-right border border-slate-300">Gross Income</th>
-                <th className="p-1 text-right border border-slate-300">Net Loss</th>
-                <th className="p-1 text-right border border-slate-300">Discount</th>
-                <th className="p-1 text-right border border-slate-300">PV</th>
-                <th className="p-1 text-right border border-slate-300">Cumulative</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reportSnapshot.periods.map((row, idx) => (
-                <tr key={idx} className={row.periodType === 'past' ? 'bg-slate-50' : ''}>
-                  <td className="p-1 border border-slate-300 font-mono">{row.yearNum}</td>
-                  <td className="p-1 border border-slate-300 text-center font-mono">{row.calendarYear}</td>
-                  <td className="p-1 border border-slate-300 text-center text-[8pt]">{row.periodType === 'past' ? 'Past' : 'Future'}</td>
-                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.grossIncome)}</td>
-                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.netLoss)}</td>
-                  <td className="p-1 border border-slate-300 text-right font-mono">{row.discountFactor.toFixed(4)}</td>
-                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.presentValue)}</td>
-                  <td className="p-1 border border-slate-300 text-right font-mono font-bold">{fmtUSD(row.cumulativePV)}</td>
+          <div className="overflow-x-auto -mx-2 px-2">
+            <table className="w-full text-[9pt] border-collapse min-w-[600px]">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="p-1 text-left border border-slate-300">Year</th>
+                  <th className="p-1 text-center border border-slate-300">Calendar</th>
+                  <th className="p-1 text-center border border-slate-300">Period</th>
+                  <th className="p-1 text-right border border-slate-300">Gross Income</th>
+                  <th className="p-1 text-right border border-slate-300">Net Loss</th>
+                  <th className="p-1 text-right border border-slate-300">Discount</th>
+                  <th className="p-1 text-right border border-slate-300">PV</th>
+                  <th className="p-1 text-right border border-slate-300">Cumulative</th>
                 </tr>
-              ))}
-              <tr className="bg-slate-100 font-bold">
-                <td colSpan={4} className="p-1 border border-slate-300 text-right">TOTALS</td>
-                <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(projection.totalPastLoss + projection.totalFutureNominal)}</td>
-                <td className="p-1 border border-slate-300"></td>
-                <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(projection.totalPastLoss + projection.totalFuturePV)}</td>
-                <td className="p-1 border border-slate-300"></td>
-              </tr>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {reportSnapshot.periods.map((row, idx) => (
+                  <tr key={idx} className={row.periodType === 'past' ? 'bg-slate-50' : ''}>
+                    <td className="p-1 border border-slate-300 font-mono">{row.yearNum}</td>
+                    <td className="p-1 border border-slate-300 text-center font-mono">{row.calendarYear}</td>
+                    <td className="p-1 border border-slate-300 text-center text-[8pt]">{row.periodType === 'past' ? 'Past' : 'Future'}</td>
+                    <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.grossIncome)}</td>
+                    <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.netLoss)}</td>
+                    <td className="p-1 border border-slate-300 text-right font-mono">{row.discountFactor.toFixed(4)}</td>
+                    <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(row.presentValue)}</td>
+                    <td className="p-1 border border-slate-300 text-right font-mono font-bold">{fmtUSD(row.cumulativePV)}</td>
+                  </tr>
+                ))}
+                <tr className="bg-slate-100 font-bold">
+                  <td colSpan={4} className="p-1 border border-slate-300 text-right">TOTALS</td>
+                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(projection.totalPastLoss + projection.totalFutureNominal)}</td>
+                  <td className="p-1 border border-slate-300"></td>
+                  <td className="p-1 border border-slate-300 text-right font-mono">{fmtUSD(projection.totalPastLoss + projection.totalFuturePV)}</td>
+                  <td className="p-1 border border-slate-300"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <p className="text-[9pt] text-slate-600 mt-2">
             <strong>Note:</strong> Past losses are shown at nominal value (discount factor = 1.0). Future losses are discounted to present value using a {earningsParams.discountRate}% annual rate with mid-year convention.
           </p>
@@ -649,39 +651,41 @@ export const ReportStep: React.FC<ReportStepProps> = ({
         {lcpItems.length > 0 && (
           <section className="mb-8">
             <h2 className="text-lg font-bold uppercase border-b-2 border-slate-900 pb-2 mb-4">Life Care Plan Summary</h2>
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="p-2 text-left border border-slate-300">Item</th>
-                  <th className="p-2 text-left border border-slate-300">Category</th>
-                  <th className="p-2 text-right border border-slate-300">Base Cost</th>
-                  <th className="p-2 text-right border border-slate-300">Duration</th>
-                  <th className="p-2 text-right border border-slate-300">PV</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lcpData.items.map(item => {
-                  const endYear = item.endYear ?? item.startYear + item.duration - 1;
-                  const duration = Math.max(1, endYear - item.startYear + 1);
-                  const durationLabel = item.useCustomYears
-                    ? `${item.customYears.length} selected`
-                    : `${duration} yrs`;
-                  return (
-                    <tr key={item.id}>
-                      <td className="p-2 border border-slate-300">{item.name}</td>
-                      <td className="p-2 border border-slate-300">{item.categoryId}</td>
-                      <td className="p-2 border border-slate-300 text-right">{fmtUSD(item.baseCost)}</td>
-                      <td className="p-2 border border-slate-300 text-right">{durationLabel}</td>
-                      <td className="p-2 border border-slate-300 text-right font-bold">{fmtUSD(item.totalPV)}</td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-slate-100 font-bold">
-                  <td colSpan={4} className="p-2 border border-slate-300 text-right">TOTAL</td>
-                  <td className="p-2 border border-slate-300 text-right">{fmtUSD(lcpData.totalPV)}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="overflow-x-auto -mx-2 px-2">
+              <table className="w-full text-sm border-collapse min-w-[500px]">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="p-2 text-left border border-slate-300">Item</th>
+                    <th className="p-2 text-left border border-slate-300">Category</th>
+                    <th className="p-2 text-right border border-slate-300">Base Cost</th>
+                    <th className="p-2 text-right border border-slate-300">Duration</th>
+                    <th className="p-2 text-right border border-slate-300">PV</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lcpData.items.map(item => {
+                    const endYear = item.endYear ?? item.startYear + item.duration - 1;
+                    const duration = Math.max(1, endYear - item.startYear + 1);
+                    const durationLabel = item.useCustomYears
+                      ? `${item.customYears.length} selected`
+                      : `${duration} yrs`;
+                    return (
+                      <tr key={item.id}>
+                        <td className="p-2 border border-slate-300">{item.name}</td>
+                        <td className="p-2 border border-slate-300">{item.categoryId}</td>
+                        <td className="p-2 border border-slate-300 text-right">{fmtUSD(item.baseCost)}</td>
+                        <td className="p-2 border border-slate-300 text-right">{durationLabel}</td>
+                        <td className="p-2 border border-slate-300 text-right font-bold">{fmtUSD(item.totalPV)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-slate-100 font-bold">
+                    <td colSpan={4} className="p-2 border border-slate-300 text-right">TOTAL</td>
+                    <td className="p-2 border border-slate-300 text-right">{fmtUSD(lcpData.totalPV)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 
@@ -692,35 +696,37 @@ export const ReportStep: React.FC<ReportStepProps> = ({
             <p className="mb-4 text-sm">
               The following table presents projected damages under multiple retirement age scenarios. The active scenario ({scenarioProjections.find(s => s.id === selectedScenario)?.label || 'N/A'}) is used for primary calculations throughout this report.
             </p>
-            <table className="w-full text-sm border-collapse mb-4">
-              <thead>
-                <tr className="bg-slate-100">
-                  <th className="p-2 text-left border border-slate-300">Scenario</th>
-                  <th className="p-2 text-right border border-slate-300">Ret. Age</th>
-                  <th className="p-2 text-right border border-slate-300">YFS</th>
-                  <th className="p-2 text-right border border-slate-300">WLF</th>
-                  <th className="p-2 text-right border border-slate-300">Past Loss</th>
-                  <th className="p-2 text-right border border-slate-300">Future (PV)</th>
-                  <th className="p-2 text-right border border-slate-300">Grand Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scenarioProjections.filter(s => s.included).map(scenario => (
-                  <tr key={scenario.id} className={scenario.id === selectedScenario ? 'bg-slate-100' : ''}>
-                    <td className="p-2 border border-slate-300">
-                      {scenario.label}
-                      {scenario.id === selectedScenario && <span className="ml-1 text-[9px] font-bold">(ACTIVE)</span>}
-                    </td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
-                    <td className="p-2 border border-slate-300 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
-                    <td className="p-2 border border-slate-300 text-right font-mono font-bold">{fmtUSD(scenario.grandTotal)}</td>
+            <div className="overflow-x-auto -mx-2 px-2">
+              <table className="w-full text-sm border-collapse mb-4 min-w-[600px]">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="p-2 text-left border border-slate-300">Scenario</th>
+                    <th className="p-2 text-right border border-slate-300">Ret. Age</th>
+                    <th className="p-2 text-right border border-slate-300">YFS</th>
+                    <th className="p-2 text-right border border-slate-300">WLF</th>
+                    <th className="p-2 text-right border border-slate-300">Past Loss</th>
+                    <th className="p-2 text-right border border-slate-300">Future (PV)</th>
+                    <th className="p-2 text-right border border-slate-300">Grand Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {scenarioProjections.filter(s => s.included).map(scenario => (
+                    <tr key={scenario.id} className={scenario.id === selectedScenario ? 'bg-slate-100' : ''}>
+                      <td className="p-2 border border-slate-300">
+                        {scenario.label}
+                        {scenario.id === selectedScenario && <span className="ml-1 text-[9px] font-bold">(ACTIVE)</span>}
+                      </td>
+                      <td className="p-2 border border-slate-300 text-right font-mono">{scenario.retirementAge.toFixed(1)}</td>
+                      <td className="p-2 border border-slate-300 text-right font-mono">{scenario.yfs.toFixed(2)}</td>
+                      <td className="p-2 border border-slate-300 text-right font-mono">{scenario.wlfPercent.toFixed(2)}%</td>
+                      <td className="p-2 border border-slate-300 text-right font-mono">{fmtUSD(scenario.totalPastLoss)}</td>
+                      <td className="p-2 border border-slate-300 text-right font-mono">{fmtUSD(scenario.totalFuturePV)}</td>
+                      <td className="p-2 border border-slate-300 text-right font-mono font-bold">{fmtUSD(scenario.grandTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <p className="text-[10pt] text-slate-600">
               <strong>Key:</strong> Ret. Age = Retirement Age; YFS = Years to Final Separation (from injury date to retirement); WLF = Work Life Factor (WLE ÷ YFS × 100%). Grand Total includes earnings loss, household services (if applicable), and life care plan costs.
             </p>
