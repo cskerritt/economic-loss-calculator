@@ -131,6 +131,32 @@ The Tinari Algebraic Method is the **core calculation methodology** used to comp
 ### Key Insight
 Fringe benefits are added AFTER unemployment adjustment, but taxes are only applied to BASE EARNINGS (not fringe benefits, which are typically pre-tax or tax-advantaged).
 
+### Optional Toggles
+
+The calculator provides two optional toggles to customize the Tinari methodology based on specific case requirements:
+
+#### 1. Fringe Benefits Toggle (ON/OFF)
+- **Default**: ON (includes fringe benefits as per standard Tinari method)
+- **Purpose**: Allows experts to exclude fringe benefits if they are not applicable or documented
+- **When OFF**: Fringe factor = 1.0 (no fringe benefits added to compensation)
+- **Use Cases**: 
+  - Cases where fringe benefits are unknown or disputed
+  - Simplified calculations for initial damage estimates
+  - Jurisdictions that exclude fringe benefits from damages
+
+#### 2. Present Value Discounting Toggle (ON/OFF)
+- **Default**: ON (applies present value discounting to future losses)
+- **Purpose**: Allows calculation of nominal (undiscounted) future values when needed
+- **When OFF**: All discount factors = 1.0 (no discounting applied)
+- **Applies To**: 
+  - Future earnings projections
+  - Household services calculations
+  - Life care plan items
+- **Use Cases**:
+  - Structured settlement scenarios where timing matches payment schedules
+  - Jurisdictions that prohibit or don't require present value discounting
+  - Comparing nominal vs. discounted damages
+
 ### Step-by-Step Formula
 
 The Tinari method follows these sequential steps:
@@ -157,9 +183,12 @@ The unemployment factor accounts for:
 - Partial income replacement from unemployment insurance (e.g., 40%)
 - Net unemployment loss = 4.2% × (1 - 0.40) = 2.52%
 
-#### Step 4: Add Fringe Benefits
+#### Step 4: Add Fringe Benefits (if enabled)
 ```
-Gross Compensation with Fringes = Unemployment Adjusted Base × (1 + FB)
+IF enableFringeBenefits = TRUE:
+  Gross Compensation with Fringes = Unemployment Adjusted Base × (1 + FB)
+ELSE:
+  Gross Compensation with Fringes = Unemployment Adjusted Base × 1.0
 
 Where: FB = Fringe Benefit Rate (as decimal)
 ```
@@ -625,10 +654,30 @@ Convert future dollars to present value, recognizing that money received today i
 - Investment opportunity
 - Inflation
 
+### Toggle Option
+
+The calculator includes an **enablePresentValue** toggle that controls whether present value discounting is applied:
+
+- **Default**: ON (applies present value discounting per standard forensic economics practice)
+- **When OFF**: All future values remain at nominal (undiscounted) amounts
+- **Applies To**:
+  - Future earnings loss projections
+  - Household services future values
+  - Life care plan future expenses
+
+**Use Cases for Disabling Present Value:**
+- Structured settlements where payment timing matches loss timing
+- Jurisdictions that prohibit present value reduction
+- Nominal damage presentations (before discount negotiation)
+- Comparing discounted vs. undiscounted scenarios
+
 ### Formula
 
 ```
-PV = FV / (1 + r)^t
+IF enablePresentValue = TRUE:
+  PV = FV / (1 + r)^t
+ELSE:
+  PV = FV (no discounting)
 
 Where:
   PV = Present Value

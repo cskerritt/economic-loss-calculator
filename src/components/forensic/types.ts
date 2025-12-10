@@ -68,6 +68,9 @@ export interface EarningsParams {
   isWrongfulDeath: boolean;
   era1PersonalConsumption: number; // Personal consumption rate for Era 1 (%)
   era2PersonalConsumption: number; // Personal consumption rate for Era 2 (%)
+  // Tinari methodology toggles
+  enableFringeBenefits: boolean; // Toggle to include/exclude fringe benefits in calculations
+  enablePresentValue: boolean; // Toggle to include/exclude present value discounting
 }
 
 export interface HhServices {
@@ -246,6 +249,9 @@ export const DEFAULT_EARNINGS_PARAMS: EarningsParams = {
   isWrongfulDeath: false,
   era1PersonalConsumption: 25.0,
   era2PersonalConsumption: 20.0,
+  // Tinari methodology toggles
+  enableFringeBenefits: true, // Default to ON for standard Tinari method
+  enablePresentValue: true, // Default to ON for standard present value discounting
 };
 
 export const RETIREMENT_SCENARIOS = [
