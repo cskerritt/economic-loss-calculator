@@ -11,9 +11,20 @@ import {
   ScenarioProjection,
 } from "./types";
 
+/**
+ * Milliseconds per year constant (accounting for leap years)
+ * 365.25 days accounts for the average across leap year cycles
+ */
 const MS_PER_YEAR = 1000 * 60 * 60 * 24 * 365.25;
 
-// Parse date from MM/DD/YYYY format (or fallback to ISO format for backwards compatibility)
+/**
+ * Parse date from MM/DD/YYYY format (or fallback to ISO format for backwards compatibility)
+ * 
+ * @param dateStr - Date string in MM/DD/YYYY or YYYY-MM-DD format
+ * @returns Date object or invalid date if parsing fails
+ * 
+ * Example: parseDate("3/15/2020") → Date object for March 15, 2020
+ */
 export function parseDate(dateStr: string): Date {
   if (!dateStr) return new Date(NaN);
   
@@ -28,6 +39,24 @@ export function parseDate(dateStr: string): Date {
   return new Date(dateStr);
 }
 
+/**
+ * Compute all date-based calculations for the case
+ * 
+ * Calculates:
+ * - Age at injury: How old the plaintiff was when injured
+ * - Age at trial: How old at the trial/valuation date
+ * - Current age: How old today
+ * - Past years: Time elapsed from injury to trial (for past loss calculations)
+ * - Derived YFS: Years from trial to retirement (for future loss calculations)
+ * 
+ * @param caseInfo - Case information containing dates
+ * @param today - Current date (defaults to now, can be overridden for testing)
+ * @returns DateCalc object with all computed age and time values
+ * 
+ * Example:
+ *   DOB: 1/15/1985, DOI: 3/10/2020, DOT: 6/15/2023, Retirement: 67
+ *   → ageInjury: 35.2, ageTrial: 38.4, pastYears: 3.3, derivedYFS: 28.6
+ */
 export function computeDateCalc(caseInfo: CaseInfo, today: Date = new Date()): DateCalc {
   if (!caseInfo.dob || !caseInfo.dateOfInjury || !caseInfo.dateOfTrial) {
     return { ageInjury: "0", ageTrial: "0", currentAge: "0", pastYears: 0, derivedYFS: 0 };
@@ -37,11 +66,17 @@ export function computeDateCalc(caseInfo: CaseInfo, today: Date = new Date()): D
   const doi = parseDate(caseInfo.dateOfInjury);
   const dot = parseDate(caseInfo.dateOfTrial);
 
+  // Calculate age at any date by converting milliseconds to years
   const getAge = (d: Date) => (d.getTime() - dob.getTime()) / MS_PER_YEAR;
+  
+  // Past years = time from injury to trial (can include partial years)
   const pastYears = Math.max(0, (dot.getTime() - doi.getTime()) / MS_PER_YEAR);
 
+  // Calculate expected retirement date based on retirement age
   const targetRetirementDate = new Date(dob);
   targetRetirementDate.setFullYear(dob.getFullYear() + caseInfo.retirementAge);
+  
+  // Years to Final Separation (YFS) = time from trial to retirement
   const derivedYFS = Math.max(0, (targetRetirementDate.getTime() - dot.getTime()) / MS_PER_YEAR);
 
   return {
@@ -53,6 +88,27 @@ export function computeDateCalc(caseInfo: CaseInfo, today: Date = new Date()): D
   };
 }
 
+/**
+ * Compute the Work Life Factor (WLF)
+ * 
+ * The WLF represents the percentage of remaining years to retirement that the plaintiff
+ * would have actually worked, accounting for periods of unemployment, disability, early
+ * retirement, etc. Based on actuarial work-life expectancy tables (e.g., Skoog-Ciecka).
+ * 
+ * Formula: WLF = (WLE / YFS) × 100%
+ * 
+ * @param earningsParams - Parameters including work life expectancy (WLE)
+ * @param derivedYFS - Years from trial to retirement (Years to Final Separation)
+ * @returns Work Life Factor as a percentage (e.g., 87.4 means 87.4%)
+ * 
+ * Example:
+ *   WLE = 25 years (from actuarial tables)
+ *   YFS = 28.6 years (from age 38.4 to 67)
+ *   WLF = (25 / 28.6) × 100 = 87.41%
+ *   
+ *   Interpretation: Plaintiff would have worked 87.41% of remaining years,
+ *   with 12.59% lost to unemployment, disability, or early retirement.
+ */
 export function computeWorkLifeFactor(earningsParams: EarningsParams, derivedYFS: number): number {
   if (derivedYFS <= 0) return 0;
   return (earningsParams.wle / derivedYFS) * 100;
@@ -61,40 +117,84 @@ export function computeWorkLifeFactor(earningsParams: EarningsParams, derivedYFS
 /**
  * Tinari Algebraic Method Implementation
  * 
- * Formula: AIF = {[((GE × WLF) × (1 - UF)) × (1 + FB)] - [(GE × WLF) × (1 - UF)] × TL} × (1 - PC)
+ * The Tinari Method is a widely accepted forensic economics approach for calculating the
+ * Adjusted Income Factor (AIF), which converts gross earnings into compensable net loss.
  * 
- * Key insight: Fringe benefits are added AFTER unemployment adjustment, but taxes are only 
- * applied to the BASE EARNINGS portion (not on fringe benefits, since they're typically pre-tax).
+ * Complete Formula:
+ * AIF = {[((GE × WLF) × (1 - UF)) × (1 + FB)] - [(GE × WLF) × (1 - UF)] × TL} × (1 - PC)
  * 
- * Step-by-step:
- * 1. Start with 100% of Gross Earnings
- * 2. × Work Life Factor = Worklife-Adjusted Base
- * 3. × (1 - Unemployment Factor) = Unemployment-Adjusted Base
- * 4. × (1 + Fringe Benefits) = Gross Compensation with Fringes
- * 5. - Tax Liabilities (on base earnings only, NOT on fringe benefits)
- * 6. × (1 - Personal Consumption) = Adjusted Income Factor (AIF) [for wrongful death]
+ * Where:
+ * - GE = Gross Earnings (100% or $1.00)
+ * - WLF = Work Life Factor (as decimal, e.g., 0.8741)
+ * - UF = Unemployment Factor = UR × (1 - UI Replacement Rate)
+ * - FB = Fringe Benefits Rate (as decimal, e.g., 0.215 for 21.5%)
+ * - TL = Tax Liability (combined federal & state)
+ * - PC = Personal Consumption (wrongful death only, e.g., 0.25 for 25%)
+ * 
+ * Key Insight (Tinari's Innovation):
+ * Fringe benefits are added AFTER unemployment adjustment, but taxes are ONLY applied
+ * to the BASE EARNINGS portion (not on fringe benefits). This is because most fringe
+ * benefits (health insurance, pension, etc.) are pre-tax or tax-advantaged.
+ * 
+ * Sequential Steps:
+ * 1. Start with 100% of Gross Earnings (GE)
+ * 2. Multiply by Work Life Factor → Worklife-Adjusted Base
+ * 3. Multiply by (1 - Unemployment Factor) → Unemployment-Adjusted Base
+ * 4. Multiply by (1 + Fringe Benefits) → Gross Compensation with Fringes
+ * 5. Subtract Tax Liability (computed on base earnings only, NOT fringes)
+ * 6. Multiply by (1 - Personal Consumption) → Final AIF [wrongful death only]
+ * 
+ * Example Calculation:
+ *   WLF = 0.8741, UF = 0.0252, FB = 0.215, Fed Tax = 15%, State Tax = 4.5%
+ *   
+ *   Step 1: Base = 1.0000
+ *   Step 2: Worklife = 1.0000 × 0.8741 = 0.8741
+ *   Step 3: Unemployment = 0.8741 × 0.9748 = 0.8521
+ *   Step 4: With Fringes = 0.8521 × 1.215 = 1.0353
+ *   Step 5: Combined Tax = 1 - [(1-0.15) × (1-0.045)] = 0.1882
+ *            Tax on Base = 0.8521 × 0.1882 = 0.1604
+ *            After Tax = 1.0353 - 0.1604 = 0.8749
+ *   
+ *   Result: For every $1 of gross earnings lost, compensable loss is $0.8749
+ * 
+ * @param earningsParams - All earnings-related parameters
+ * @param dateCalc - Date calculations including YFS
+ * @param isUnionMode - If true, use flat-dollar fringe amounts instead of percentage
+ * @returns Algebraic object with all intermediate values and final AIF
  */
 export function computeAlgebraic(
   earningsParams: EarningsParams,
   dateCalc: DateCalc,
   isUnionMode: boolean,
 ): Algebraic {
+  // Step 1 & 2: Calculate Work Life Factor (WLF)
+  // WLF = WLE / YFS (as decimal, not percentage)
   const yfs = dateCalc.derivedYFS;
   const wlf = yfs > 0 ? earningsParams.wle / yfs : 0;
   
-  // Unemployment factor: (1 - UF × (1 - UI replacement))
+  // Step 3: Calculate Unemployment Factor
+  // Formula: (1 - UF) where UF = Unemployment Rate × (1 - UI Replacement Rate)
+  // Example: 4.2% unemployment × (1 - 40% replacement) = 2.52% net unemployment loss
+  // Result: 1 - 0.0252 = 0.9748 (97.48% of earnings retained after unemployment)
   const unempFactor =
     1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
   
-  // After-tax factor for base earnings
+  // Step 5a: Calculate After-Tax Factor for base earnings
+  // Combined tax calculation accounts for both federal and state taxes
+  // Formula: (1 - Fed Rate) × (1 - State Rate)
+  // Example: (1 - 0.15) × (1 - 0.045) = 0.85 × 0.955 = 0.8118 (81.18% after tax)
   const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
   const combinedTaxRate = 1 - afterTaxFactor;
 
-  // Fringe benefits factor: (1 + FB)
+  // Step 4: Calculate Fringe Benefits Factor (1 + FB)
+  // Two modes: Union mode uses flat dollar amounts, standard mode uses percentage
   let fringeFactor = 1;
   let flatFringeAmount = 0;
 
   if (isUnionMode) {
+    // Union Mode: Flat dollar fringe benefits (common in union contracts)
+    // Example: Pension $5,000 + Health $8,000 + Other $2,000 = $15,000 total
+    // If base earnings = $75,000, effective rate = $15,000 / $75,000 = 20%
     flatFringeAmount =
       earningsParams.pension +
       earningsParams.healthWelfare +
@@ -105,10 +205,15 @@ export function computeAlgebraic(
       earningsParams.baseEarnings > 0 ? flatFringeAmount / earningsParams.baseEarnings : 0;
     fringeFactor = 1 + effectiveFringeRate;
   } else {
+    // Standard Mode: Percentage-based fringe benefits
+    // Example: 21.5% fringe rate → fringeFactor = 1.215
     fringeFactor = 1 + earningsParams.fringeRate / 100;
   }
 
-  // Personal consumption factors (for wrongful death cases)
+  // Step 6: Personal Consumption Factors (for wrongful death cases only)
+  // Represents portion of income decedent would have spent on themselves
+  // Example: 25% personal consumption → factor = 0.75 (75% goes to survivors)
+  // Different rates can apply to past (Era 1) vs. future (Era 2) periods
   const era1PersonalConsumptionFactor = earningsParams.isWrongfulDeath 
     ? (1 - earningsParams.era1PersonalConsumption / 100) 
     : 1;
@@ -116,26 +221,51 @@ export function computeAlgebraic(
     ? (1 - earningsParams.era2PersonalConsumption / 100) 
     : 1;
 
-  // Tinari step-by-step breakdown (as percentages of gross earnings)
+  // === TINARI METHOD STEP-BY-STEP CALCULATION ===
+  // All values expressed as multipliers of gross earnings (treat GE as 1.00 or 100%)
+  
+  // Step 1-2: Worklife-Adjusted Base
+  // Apply work life factor to account for time actually worked
+  // Example: 100% × 0.8741 WLF = 87.41% (worked years only)
   const worklifeAdjustedBase = wlf; // 100% × WLF
+  
+  // Step 3: Unemployment-Adjusted Base
+  // Apply unemployment factor to account for job search periods
+  // Example: 87.41% × 0.9748 = 85.21% (after unemployment losses)
+  // Note: Intermediate calculations may show slight variations due to decimal precision
+  // Actual: 0.8741 × 0.9748 = 0.8521017... ≈ 0.8521
   const unemploymentAdjustedBase = worklifeAdjustedBase * unempFactor; // × (1 - UF)
+  
+  // Step 4: Gross Compensation with Fringe Benefits
+  // Add fringe benefits (health insurance, pension, etc.)
+  // Example: 85.21% × 1.215 = 103.53% (gross compensation including fringes)
   const grossCompensationWithFringes = unemploymentAdjustedBase * fringeFactor; // × (1 + FB)
   
-  // CRITICAL: Tax is applied only to the BASE EARNINGS portion, not fringe benefits
-  // Tax liability = (base earnings portion) × tax rate
-  // In the Tinari formula, this means we subtract taxes from the base, not from fringes
+  // Step 5: Tax Liability Calculation (CRITICAL STEP)
+  // Taxes are computed on the BASE EARNINGS portion ONLY, not on fringe benefits
+  // This is the key innovation of the Tinari method - fringes are often pre-tax
+  // Example: 85.21% × 18.82% tax rate = 16.04% tax liability
   const taxOnBaseEarnings = unemploymentAdjustedBase * combinedTaxRate;
+  
+  // After-Tax Compensation (before personal consumption)
+  // Subtract tax liability from gross compensation with fringes
+  // Example: 103.53% - 16.04% = 87.49% (after-tax compensation)
+  // This is the base AIF for personal injury cases
   const afterTaxCompensation = grossCompensationWithFringes - taxOnBaseEarnings;
 
-  // Era-specific AIFs (with personal consumption for wrongful death)
+  // Step 6: Era-Specific AIFs (with personal consumption for wrongful death)
+  // For Personal Injury: AIF = afterTaxCompensation (no personal consumption)
+  // For Wrongful Death: AIF = afterTaxCompensation × (1 - PC)
+  // Example WD: 87.49% × 0.75 (25% PC) = 65.62%
   const era1AIF = afterTaxCompensation * era1PersonalConsumptionFactor;
   const era2AIF = afterTaxCompensation * era2PersonalConsumptionFactor;
 
   // Legacy full multiplier (for backward compatibility)
+  // This represents the complete AIF without personal consumption
   // Note: The old formula was incorrect - it applied tax to everything including fringes
-  // New Tinari formula: AIF = [(base × WLF × (1-UF)) × (1+FB)] - [(base × WLF × (1-UF)) × TL] × (1-PC)
+  // The new Tinari formula correctly separates base earnings from fringe benefits for taxation
   const fullMultiplier = afterTaxCompensation; // Without personal consumption (PI cases)
-  const realizedMultiplier = afterTaxFactor * fringeFactor;
+  const realizedMultiplier = afterTaxFactor * fringeFactor; // Simplified version for residual earnings
 
   return {
     wlf,
@@ -151,6 +281,7 @@ export function computeAlgebraic(
     era2PersonalConsumptionFactor,
     era1AIF,
     era2AIF,
+    // Step-by-step breakdown for transparency and reporting
     worklifeAdjustedBase,
     unemploymentAdjustedBase,
     grossCompensationWithFringes,
@@ -159,6 +290,38 @@ export function computeAlgebraic(
   };
 }
 
+/**
+ * Compute earnings loss projections for past and future periods
+ * 
+ * This function calculates the year-by-year economic losses from the date of injury
+ * through retirement, accounting for:
+ * - Past losses: Injury to trial (historical, not discounted)
+ * - Future losses: Trial to retirement (projected, discounted to present value)
+ * - Wage growth over time
+ * - Residual earning capacity (what plaintiff can still earn)
+ * - Actual earnings if recorded (for past years)
+ * - Era-specific wage growth (if enabled)
+ * 
+ * Formula for each year:
+ *   Gross But-For = Base Earnings × (1 + Growth Rate)^years × Year Fraction
+ *   Net But-For = Gross But-For × AIF
+ *   Net Actual = Actual or Residual Earnings × AIF
+ *   Net Loss = Net But-For - Net Actual
+ *   
+ *   For future years: PV = Net Loss × [1 / (1 + Discount Rate)^(year + 0.5)]
+ * 
+ * @param caseInfo - Case information including dates
+ * @param earningsParams - Earnings parameters including base, residual, growth, discount
+ * @param algebraic - Computed algebraic values including AIF
+ * @param pastActuals - Dictionary of actual earnings for past years {year: amount}
+ * @param dateCalc - Date calculations including past years and YFS
+ * @returns Projection object with past schedule, future schedule, and totals
+ * 
+ * Example:
+ *   Base: $75,000, Residual: $30,000, Growth: 3.5%, Discount: 4.25%, AIF: 0.8749
+ *   Year 1 Past: $75,000 × 0.8749 - $30,000 × 0.8749 = $39,371 loss
+ *   Year 1 Future: Same loss, but PV = $39,371 × 0.9793 = $38,556
+ */
 export function computeProjection(
   caseInfo: CaseInfo,
   earningsParams: EarningsParams,
@@ -261,6 +424,32 @@ export function computeProjection(
   return { pastSchedule, futureSchedule, totalPastLoss, totalFutureNominal, totalFuturePV };
 }
 
+/**
+ * Compute household services replacement value
+ * 
+ * Calculates the present value of household services that the injured party can no
+ * longer perform. Common examples include:
+ * - Childcare and supervision
+ * - Home maintenance and repairs
+ * - Meal preparation
+ * - Shopping and errands
+ * - Transportation services
+ * - Yard work
+ * 
+ * Formula for each year:
+ *   Annual Value = Hours/Week × 52 weeks × Hourly Rate × (1 + Growth Rate)^year
+ *   PV = Annual Value × [1 / (1 + Discount Rate)^(year + 0.5)]
+ * 
+ * @param hhServices - Household service parameters (hours, rate, growth, discount)
+ * @param derivedYFS - Years to final separation (duration of services needed)
+ * @returns HhsData with nominal total and present value
+ * 
+ * Example:
+ *   15 hrs/week × $25/hr × 52 weeks = $19,500/year
+ *   Year 1: $19,500 × 1.03^0 × discount = $19,096 PV
+ *   Year 2: $19,500 × 1.03^1 × discount = $18,870 PV
+ *   Total over 28.6 years ≈ $423,000 PV
+ */
 export function computeHhsData(hhServices: HhServices, derivedYFS: number): HhsData {
   if (!hhServices.active) return { totalNom: 0, totalPV: 0 };
 
@@ -268,13 +457,20 @@ export function computeHhsData(hhServices: HhServices, derivedYFS: number): HhsD
   let totalPV = 0;
   const years = Math.ceil(derivedYFS);
 
+  // Calculate value for each future year
   for (let i = 0; i < years; i++) {
+    // Annual cost with inflation growth
+    // Formula: Hours × Weeks × Rate × (1 + Growth)^years
     const annualValue =
       hhServices.hoursPerWeek *
       52 *
       hhServices.hourlyRate *
       Math.pow(1 + hhServices.growthRate / 100, i);
+    
+    // Discount to present value using mid-year convention
+    // Formula: 1 / (1 + discount rate)^(year + 0.5)
     const disc = 1 / Math.pow(1 + hhServices.discountRate / 100, i + 0.5);
+    
     totalNom += annualValue;
     totalPV += annualValue * disc;
   }
@@ -282,6 +478,43 @@ export function computeHhsData(hhServices: HhServices, derivedYFS: number): HhsD
   return { totalNom, totalPV };
 }
 
+/**
+ * Compute life care plan present values
+ * 
+ * Calculates the present value of all future medical and care expenses from a life care
+ * plan. Handles different types of expenses:
+ * 
+ * - One-time items: Occur once at a specific year (e.g., home modification)
+ * - Annual items: Occur every year (e.g., medications)
+ * - Recurring items: Occur at intervals (e.g., wheelchair replacement every 5 years)
+ * - Custom year items: Occur in specific years only (e.g., surgeries in years 1, 5, 10)
+ * 
+ * Each item inflates using category-specific CPI rates:
+ * - Physician Evals & Home Care: 2.88%
+ * - Prescription Drugs: 1.65%
+ * - Hospital/Surgical Services: 4.07%
+ * - Therapy: 1.62%
+ * - Transportation: 4.32%
+ * - Home Modifications: 4.16%
+ * - Education/Training: 2.61%
+ * 
+ * Formula:
+ *   For each applicable year t:
+ *     Year Index = (Start Year - 1) + t
+ *     Inflated Cost = Base Cost × (1 + CPI Rate)^(Year Index)
+ *     Discount = 1 / (1 + Discount Rate)^(Year Index + 0.5)
+ *     PV = Inflated Cost × Discount
+ * 
+ * @param lcpItems - Array of life care plan items
+ * @param discountRate - Discount rate for present value calculation
+ * @returns LcpData with itemized details, totals in nominal and present values
+ * 
+ * Example:
+ *   Pain Meds: $2,400/year, 1.65% CPI, 30 years
+ *   Year 1: $2,400 × 1.0165^0 × 1/1.04225^0.5 = $2,350 PV
+ *   Year 2: $2,440 × 1.0165^1 × 1/1.04225^1.5 = $2,292 PV
+ *   Total over 30 years ≈ $51,800 PV
+ */
 export function computeLcpData(lcpItems: LcpItem[], discountRate: number): LcpData {
   let totalNom = 0;
   let totalPV = 0;
