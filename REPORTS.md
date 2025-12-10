@@ -127,14 +127,35 @@ Individual CSV files for each data category, bundled in a ZIP archive.
 | `id` | string | Scenario identifier (e.g., "wle", "age65") |
 | `label` | string | Human-readable name |
 | `retirementAge` | number | Assumed retirement age |
-| `yfs` | number | Years to Final Separation |
-| `wlf` | number | Work Life Factor (decimal) |
+| `yfs` | number | Years to Final Separation (injury → retirement) |
+| `wlf` | number | Work Life Factor (WLE ÷ YFS, decimal) |
 | `wlfPercent` | number | Work Life Factor (percentage) |
 | `totalPastLoss` | number | Past loss under this scenario |
 | `totalFuturePV` | number | Future PV under this scenario |
 | `totalEarningsLoss` | number | Total earnings loss |
 | `grandTotal` | number | Grand total including HHS and LCP |
 | `included` | boolean | Whether to include in exports |
+
+## Work Life Expectancy (WLE) vs Years to Final Separation (YFS)
+
+ForensicSuite implements the Tinari Method distinction between WLE and YFS:
+
+### Work Life Expectancy (WLE)
+- Probability-weighted expected years of labor force participation
+- Derived from Markov worklife tables (Skoog, Ciecka, & Krueger, 2010)
+- Accounts for mortality, disability, unemployment, and retirement probabilities
+- Represents EXPECTED working years, not chronological time
+
+### Years to Final Separation (YFS)  
+- Chronological years from injury to expected retirement age
+- Calculated as: `YFS = Retirement Age − Age at Injury`
+- Represents the full remaining career horizon
+- YFS > WLE because it doesn't weight for labor force exits (Tinari, 2016)
+
+### Work Life Factor (WLF)
+- Formula: `WLF = WLE ÷ YFS`
+- Represents the probability that the plaintiff would have worked during each year
+- Used to adjust gross earnings to reflect statistical labor force participation
 
 ## Calculation Method: Tinari Algebraic
 
