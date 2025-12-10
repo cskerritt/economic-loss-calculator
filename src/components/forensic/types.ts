@@ -262,3 +262,63 @@ export const DEFAULT_HH_SERVICES: HhServices = {
   growthRate: 3.0,
   discountRate: 4.25
 };
+
+// ============= REPORT SNAPSHOT TYPES =============
+
+export interface ReportMetadata {
+  reportId: string;
+  generatedAt: string;
+  appVersion: string;
+  schemaVersion: string;
+  environment: 'development' | 'staging' | 'production';
+  userId?: string;
+  caseId?: string;
+  calculationMethod: 'tinari-algebraic';
+  activeScenario: string;
+  includedScenarios: string[];
+}
+
+export interface PeriodRow {
+  yearNum: number;
+  calendarYear: number;
+  periodType: 'past' | 'future';
+  grossIncome: number;
+  netLoss: number;
+  discountFactor: number;
+  presentValue: number;
+  cumulativePV: number;
+}
+
+export interface SummaryMetrics {
+  totalPastLoss: number;
+  totalFuturePV: number;
+  totalEarningsLoss: number;
+  householdServicesPV: number;
+  lifeCareplanPV: number;
+  grandTotal: number;
+}
+
+export interface EconomicLossReport {
+  metadata: ReportMetadata;
+  assumptions: {
+    caseInfo: CaseInfo;
+    earningsParams: EarningsParams;
+    hhServices: HhServices;
+    lcpItems: LcpItem[];
+    isUnionMode: boolean;
+  };
+  calculations: {
+    dateCalc: DateCalc;
+    algebraic: Algebraic;
+    projection: Projection;
+    hhsData: HhsData;
+    lcpData: LcpData;
+    workLifeFactor: number;
+  };
+  results: {
+    scenarioProjections: ScenarioProjection[];
+    grandTotal: number;
+    summaryMetrics: SummaryMetrics;
+  };
+  periods: PeriodRow[];
+}
