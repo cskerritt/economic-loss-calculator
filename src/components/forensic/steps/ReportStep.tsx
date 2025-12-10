@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { FileText, FileDown, Download, Loader2, AlertTriangle, CheckCircle2, ArrowRight, ChevronDown, Briefcase, HeartPulse, Target, Home, Copy, FileSpreadsheet, FileJson } from 'lucide-react';
+import { FileText, FileDown, Download, Loader2, AlertTriangle, CheckCircle2, ArrowRight, ChevronDown, Briefcase, HeartPulse, Target, Home, Copy, FileSpreadsheet, FileJson, Eye } from 'lucide-react';
 import { CaseInfo, EarningsParams, HhServices, LcpItem, DateCalc, Algebraic, Projection, HhsData, LcpData, ScenarioProjection, EconomicLossReport } from '../types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportSectionToWord, ExportSection } from '../exportUtils';
 import { generateReportSnapshot } from '../reportSnapshot';
 import { exportReportToJson, copyReportSummaryToClipboard } from '../jsonExport';
 import { exportReportToExcel } from '../excelExport';
+import { ReportPreviewModal } from '../ReportPreviewModal';
 import { toast } from 'sonner';
 
 export interface ValidationCheck {
@@ -83,6 +84,7 @@ export const ReportStep: React.FC<ReportStepProps> = ({
   const [exportingSection, setExportingSection] = useState<ExportSection | null>(null);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingJson, setIsExportingJson] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '[Date]';
@@ -270,8 +272,19 @@ export const ReportStep: React.FC<ReportStepProps> = ({
         <h2 className="text-xl sm:text-2xl font-bold text-foreground">Generate Report</h2>
         <p className="text-sm text-muted-foreground mt-1">Export your complete economic appraisal report</p>
         
+        {/* Preview Button */}
+        <div className="mt-4">
+          <button 
+            onClick={() => setPreviewOpen(true)} 
+            disabled={!allValid}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:from-indigo-700 hover:to-purple-700 flex items-center justify-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]"
+          >
+            <Eye className="w-5 h-5" /> Preview Report
+          </button>
+        </div>
+        
         {/* Primary Export Buttons */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center mt-4 sm:mt-6">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center mt-4">
           <button onClick={onPrint} disabled={!allValid} className="bg-slate-900 text-white px-5 py-3 min-h-[48px] rounded-full font-bold shadow-lg hover:bg-slate-800 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-[0.98]">
             <FileText className="w-5 h-5" /> Print Report
           </button>
@@ -304,6 +317,34 @@ export const ReportStep: React.FC<ReportStepProps> = ({
           <p className="text-xs text-destructive mt-3">Complete all required fields above to enable export</p>
         )}
       </div>
+
+      {/* Report Preview Modal */}
+      <ReportPreviewModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        reportSnapshot={reportSnapshot}
+        caseInfo={caseInfo}
+        earningsParams={earningsParams}
+        hhServices={hhServices}
+        lcpItems={lcpItems}
+        dateCalc={dateCalc}
+        algebraic={algebraic}
+        projection={projection}
+        hhsData={hhsData}
+        lcpData={lcpData}
+        workLifeFactor={workLifeFactor}
+        grandTotal={grandTotal}
+        isUnionMode={isUnionMode}
+        scenarioProjections={scenarioProjections}
+        selectedScenario={selectedScenario}
+        isExportingPdf={isExportingPdf}
+        isExportingWord={isExportingWord}
+        onPrint={onPrint}
+        onExportPdf={onExportPdf}
+        onExportWord={onExportWord}
+        fmtUSD={fmtUSD}
+        fmtPct={fmtPct}
+      />
 
       {/* Section Export Options */}
       <div className="print:hidden mb-6">
