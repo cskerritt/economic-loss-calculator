@@ -151,11 +151,11 @@ export function computeWorkLifeFactor(earningsParams: EarningsParams, derivedYFS
  *   Step 2: Worklife = 1.0000 × 0.8741 = 0.8741
  *   Step 3: Unemployment = 0.8741 × 0.9748 = 0.8521
  *   Step 4: With Fringes = 0.8521 × 1.215 = 1.0353
- *   Step 5: Combined Tax = 1 - [(1-0.15) × (1-0.045)] = 0.1882
- *            Tax on Base = 0.8521 × 0.1882 = 0.1604
- *            After Tax = 1.0353 - 0.1604 = 0.8749
+ *   Step 5: Combined Tax = 0.15 + 0.045 = 0.195 (simple additive method)
+ *            Tax on Base = 0.8521 × 0.195 = 0.1662
+ *            After Tax = 1.0353 - 0.1662 = 0.8691
  *   
- *   Result: For every $1 of gross earnings lost, compensable loss is $0.8749
+ *   Result: For every $1 of gross earnings lost, compensable loss is $0.8691
  * 
  * @param earningsParams - All earnings-related parameters
  * @param dateCalc - Date calculations including YFS
@@ -179,12 +179,13 @@ export function computeAlgebraic(
   const unempFactor =
     1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
   
-  // Step 5a: Calculate After-Tax Factor for base earnings
-  // Combined tax calculation accounts for both federal and state taxes
-  // Formula: (1 - Fed Rate) × (1 - State Rate)
-  // Example: (1 - 0.15) × (1 - 0.045) = 0.85 × 0.955 = 0.8118 (81.18% after tax)
-  const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
-  const combinedTaxRate = 1 - afterTaxFactor;
+  // Step 5a: Calculate Combined Tax Rate for base earnings
+  // Forensic economics standard: Use simple additive method for combined taxes
+  // Formula: Combined Tax Rate = Federal Tax Rate + State Tax Rate
+  // Example: 15% federal + 4.5% state = 19.5% combined
+  // Note: This is the standard approach in forensic economics, treating taxes as additive
+  const combinedTaxRate = (earningsParams.fedTaxRate + earningsParams.stateTaxRate) / 100;
+  const afterTaxFactor = 1 - combinedTaxRate;
 
   // Step 4: Calculate Fringe Benefits Factor (1 + FB)
   // Two modes: Union mode uses flat dollar amounts, standard mode uses percentage
@@ -211,15 +212,17 @@ export function computeAlgebraic(
   }
 
   // Step 6: Personal Consumption Factors (for wrongful death cases only)
-  // Represents portion of income decedent would have spent on themselves
-  // Example: 25% personal consumption → factor = 0.75 (75% goes to survivors)
-  // Different rates can apply to past (Era 1) vs. future (Era 2) periods
+  // Stores the actual consumption rate (e.g., 0.25 for 25% consumption)
+  // For personal injury cases, consumption factor is 0 (no consumption applies)
+  // For wrongful death cases, stores the rate (e.g., 0.25 means 25% consumed by decedent)
+  // When applying: AIF = afterTaxCompensation × (1 - personalConsumptionFactor)
+  // Example: 25% personal consumption → factor = 0.25, then apply (1 - 0.25) = 0.75 to get survivors' share
   const era1PersonalConsumptionFactor = earningsParams.isWrongfulDeath 
-    ? (1 - earningsParams.era1PersonalConsumption / 100) 
-    : 1;
+    ? (earningsParams.era1PersonalConsumption / 100) 
+    : 0;
   const era2PersonalConsumptionFactor = earningsParams.isWrongfulDeath 
-    ? (1 - earningsParams.era2PersonalConsumption / 100) 
-    : 1;
+    ? (earningsParams.era2PersonalConsumption / 100) 
+    : 0;
 
   // === TINARI METHOD STEP-BY-STEP CALCULATION ===
   // All values expressed as multipliers of gross earnings (treat GE as 1.00 or 100%)
@@ -254,18 +257,22 @@ export function computeAlgebraic(
   const afterTaxCompensation = grossCompensationWithFringes - taxOnBaseEarnings;
 
   // Step 6: Era-Specific AIFs (with personal consumption for wrongful death)
-  // For Personal Injury: AIF = afterTaxCompensation (no personal consumption)
-  // For Wrongful Death: AIF = afterTaxCompensation × (1 - PC)
-  // Example WD: 87.49% × 0.75 (25% PC) = 65.62%
-  const era1AIF = afterTaxCompensation * era1PersonalConsumptionFactor;
-  const era2AIF = afterTaxCompensation * era2PersonalConsumptionFactor;
+  // For Personal Injury: AIF = afterTaxCompensation (no personal consumption, factor = 0)
+  // For Wrongful Death: AIF = afterTaxCompensation × (1 - PC rate)
+  // Example WD: 87.49% × (1 - 0.25) = 87.49% × 0.75 = 65.62%
+  const era1AIF = afterTaxCompensation * (1 - era1PersonalConsumptionFactor);
+  const era2AIF = afterTaxCompensation * (1 - era2PersonalConsumptionFactor);
 
   // Legacy full multiplier (for backward compatibility)
-  // This represents the complete AIF without personal consumption
-  // Note: The old formula was incorrect - it applied tax to everything including fringes
-  // The new Tinari formula correctly separates base earnings from fringe benefits for taxation
-  const fullMultiplier = afterTaxCompensation; // Without personal consumption (PI cases)
-  const realizedMultiplier = afterTaxFactor * fringeFactor; // Simplified version for residual earnings
+  // For personal injury: fullMultiplier = afterTaxCompensation
+  // For wrongful death: fullMultiplier = era1AIF (with personal consumption applied)
+  const fullMultiplier = earningsParams.isWrongfulDeath ? era1AIF : afterTaxCompensation;
+  
+  // Realized multiplier for actual/residual earnings
+  // Used for manual actual earnings in past schedule calculations
+  // This is a simplified calculation that applies after-tax factor and fringes
+  // but doesn't include worklife or unemployment adjustments (those are inherent in actual earnings)
+  const realizedMultiplier = afterTaxFactor * fringeFactor;
 
   return {
     wlf,
@@ -607,8 +614,8 @@ export function computeScenarioProjections({
 
     const unempFactor =
       1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
-    const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
-    const combinedTaxRate = 1 - afterTaxFactor;
+    const combinedTaxRate = (earningsParams.fedTaxRate + earningsParams.stateTaxRate) / 100;
+    const afterTaxFactor = 1 - combinedTaxRate;
     
     let fringeFactor = 1;
     if (isUnionMode) {
@@ -630,11 +637,11 @@ export function computeScenarioProjections({
     const afterTaxCompensation = grossCompensationWithFringes - taxOnBaseEarnings;
 
     // Personal consumption factors (for wrongful death)
-    const era1PC = earningsParams.isWrongfulDeath ? (1 - earningsParams.era1PersonalConsumption / 100) : 1;
-    const era2PC = earningsParams.isWrongfulDeath ? (1 - earningsParams.era2PersonalConsumption / 100) : 1;
+    const era1PC = earningsParams.isWrongfulDeath ? (earningsParams.era1PersonalConsumption / 100) : 0;
+    const era2PC = earningsParams.isWrongfulDeath ? (earningsParams.era2PersonalConsumption / 100) : 0;
     
-    const era1AIF = afterTaxCompensation * era1PC;
-    const era2AIF = afterTaxCompensation * era2PC;
+    const era1AIF = afterTaxCompensation * (1 - era1PC);
+    const era2AIF = afterTaxCompensation * (1 - era2PC);
     
     const realizedMultiplier = afterTaxFactor * fringeFactor;
 
@@ -763,7 +770,7 @@ export function computeDetailedScenarioSchedule(
 
   const unempFactor =
     1 - (earningsParams.unemploymentRate / 100) * (1 - earningsParams.uiReplacementRate / 100);
-  const afterTaxFactor = (1 - earningsParams.fedTaxRate / 100) * (1 - earningsParams.stateTaxRate / 100);
+  const combinedTaxRate = (earningsParams.fedTaxRate + earningsParams.stateTaxRate) / 100;
 
   let fringeFactor = 1;
   if (isUnionMode) {
@@ -778,7 +785,18 @@ export function computeDetailedScenarioSchedule(
     fringeFactor = 1 + earningsParams.fringeRate / 100;
   }
 
-  const fullMultiplier = wlf * unempFactor * afterTaxFactor * fringeFactor;
+  // Apply Tinari method: taxes only on base, not on fringes
+  const unemploymentAdjustedBase = wlf * unempFactor;
+  const grossCompensationWithFringes = unemploymentAdjustedBase * fringeFactor;
+  const taxOnBaseEarnings = unemploymentAdjustedBase * combinedTaxRate;
+  const afterTaxCompensation = grossCompensationWithFringes - taxOnBaseEarnings;
+  
+  // Apply personal consumption for wrongful death cases
+  const personalConsumptionFactor = earningsParams.isWrongfulDeath 
+    ? (earningsParams.era2PersonalConsumption / 100)  // Use era2 for future projections
+    : 0;
+  const fullMultiplier = afterTaxCompensation * (1 - personalConsumptionFactor);
+  
   const schedule: DetailedScheduleRow[] = [];
   let cumPV = 0;
 
